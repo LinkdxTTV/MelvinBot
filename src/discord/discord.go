@@ -67,6 +67,7 @@ func (bot Bot) RunBot() {
 	bot.discord.AddHandler(iiwii)
 	bot.discord.AddHandler(lethimcook)
 	bot.discord.AddHandler(randomQuote)
+	bot.discord.AddHandler(miami)
 
 	err = bot.discord.Open()
 	if err != nil {
@@ -214,4 +215,20 @@ func randomQuote(s *disc.Session, m *disc.MessageCreate) {
 
 	allQuotes, _ := parse.ParseAndDedupCsv()
 	s.ChannelMessageSend(m.ChannelID, allQuotes[rand.Intn(len(allQuotes))])
+}
+
+func miami(s *disc.Session, m *disc.MessageCreate) {
+	if m.Author.ID == s.State.User.ID {
+		return // it me
+	}
+
+	if m.GuildID != util.Wolfcord_id {
+		return // only for nisha's discord
+	}
+
+	if strings.Contains(strings.ToLower(m.Message.Content), "miami") || strings.Contains(strings.ToLower(m.Message.Content), "spring break") {
+		year := []rune(fmt.Sprint(time.Now().Year()))
+		year[1] := 'k'
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprint("SPRING BREAK MIAMI %v WOOOOOOOO"), string(year))
+	}
 }
