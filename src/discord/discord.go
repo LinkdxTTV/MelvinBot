@@ -228,7 +228,7 @@ func miami(s *disc.Session, m *disc.MessageCreate) {
 
 	if strings.Contains(strings.ToLower(m.Message.Content), "miami") || strings.Contains(strings.ToLower(m.Message.Content), "spring break") {
 		year := []rune(fmt.Sprint(time.Now().Year()))
-		year[1] := 'k'
-		s.ChannelMessageSend(m.ChannelID, fmt.Sprint("SPRING BREAK MIAMI %v WOOOOOOOO"), string(year))
+		year[1] = 'k'
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("SPRING BREAK MIAMI %v WOOOOOOOO", string(year)))
 	}
 }
