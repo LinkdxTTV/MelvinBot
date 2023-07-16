@@ -16,6 +16,7 @@ import (
 	"MelvinBot/src/store"
 	"MelvinBot/src/util"
 
+	cron "github.com/robfig/cron"
 	disc "github.com/bwmarrin/discordgo"
 )
 
@@ -53,6 +54,13 @@ func (bot Bot) RunBot() {
 
 	bot.store.SyncStatsOnTimer(1 * time.Minute)
 
+	// For scheduled jobs
+	c := cron.New()
+	// Send quote at 8:00AM every day
+	quoteBoardChannelID := "1093406748783693854"
+	c.AddFunc("0 8 * * *", func() { sendRandomQuote(bot.discord, quoteBoardChannelID) })
+	c.Start()
+
 	// Add handlers here
 	bot.discord.AddHandler(monkaS)
 	bot.discord.AddHandler(stats.TrackStats)
@@ -84,6 +92,9 @@ func (bot Bot) RunBot() {
 	if err != nil {
 		log.Printf("failed dynamo put call on shutdown: %v", err)
 	}
+
+	c.Stop()
+
 	// Cleanly close down the Discord session.
 	bot.discord.Close()
 }
@@ -200,6 +211,11 @@ func lethimcook(s *disc.Session, m *disc.MessageCreate) {
 	}
 }
 
+func sendRandomQuote(s *disc.Session, channelID string) {
+	allQuotes, _ := parse.ParseAndDedupCsv()
+	s.ChannelMessageSend(channelID, allQuotes[rand.Intn(len(allQuotes))])
+}
+
 func randomQuote(s *disc.Session, m *disc.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return // it me
@@ -213,8 +229,7 @@ func randomQuote(s *disc.Session, m *disc.MessageCreate) {
 		return
 	}
 
-	allQuotes, _ := parse.ParseAndDedupCsv()
-	s.ChannelMessageSend(m.ChannelID, allQuotes[rand.Intn(len(allQuotes))])
+	sendRandomQuote(s, m.ChannelID)
 }
 
 func miami(s *disc.Session, m *disc.MessageCreate) {
