@@ -30,7 +30,7 @@ func ParseAndDedupCsv() ([]string, error) {
 			continue
 		} else {
 			quoteExistsMap[person] = true
-			allQuotes = append(allQuotes, fmt.Sprintf("```%v```\n~%v", quote, person))
+			allQuotes = append(allQuotes, fmt.Sprintf("```%v```~%v", quote, person))
 		}
 	}
 	return allQuotes, err
