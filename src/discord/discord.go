@@ -58,7 +58,7 @@ func (bot Bot) RunBot() {
 	c := cron.New()
 	// Send quote at 8:00AM every day
 	quoteBoardChannelID := "1093406748783693854"
-	c.AddFunc("0 8 * * *", func() { sendRandomQuote(bot.discord, quoteBoardChannelID) })
+	c.AddFunc("0 0 8 * * *", func() { sendRandomQuote(bot.discord, quoteBoardChannelID) })
 	c.Start()
 
 	// Add handlers here
