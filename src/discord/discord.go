@@ -16,8 +16,8 @@ import (
 	"MelvinBot/src/store"
 	"MelvinBot/src/util"
 
-	cron "github.com/robfig/cron"
 	disc "github.com/bwmarrin/discordgo"
+	cron "github.com/robfig/cron"
 )
 
 type Bot struct {
@@ -44,15 +44,15 @@ func NewBot(token string) Bot {
 func (bot Bot) RunBot() {
 
 	if _, err := os.Stat(bot.statsfile); errors.Is(err, os.ErrNotExist) {
-		bot.store.PutStats()
+		bot.store.Put()
 	}
 
-	err := bot.store.GetStats()
+	err := bot.store.Get()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	bot.store.SyncStatsOnTimer(1 * time.Minute)
+	bot.store.SyncOnTimer(1 * time.Minute)
 
 	// For scheduled jobs
 	c := cron.New()
@@ -88,7 +88,7 @@ func (bot Bot) RunBot() {
 	<-sc
 
 	// Place stats one last time for consistency
-	err = bot.store.PutStats()
+	err = bot.store.Put()
 	if err != nil {
 		log.Printf("failed dynamo put call on shutdown: %v", err)
 	}

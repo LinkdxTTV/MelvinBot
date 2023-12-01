@@ -11,9 +11,9 @@ import (
 )
 
 type Storage interface {
-	PutStats() error
-	GetStats() error
-	SyncStatsOnTimer(time.Duration) error
+	Put() error
+	Get() error
+	SyncOnTimer(time.Duration) error
 }
 
 type localStorage struct {
@@ -34,7 +34,7 @@ func NewLocalStorage(filename ...string) (*localStorage, error) {
 	}, nil
 }
 
-func (s *localStorage) PutStats() error {
+func (s *localStorage) Put() error {
 	statsAsJson, err := json.Marshal(stats.StatsPerGuild)
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func (s *localStorage) PutStats() error {
 	return statsFile.Close()
 }
 
-func (s *localStorage) GetStats() error {
+func (s *localStorage) Get() error {
 	bytes, err := os.ReadFile(s.filename)
 	if err != nil {
 		return errors.New("could not read local stats file")
@@ -64,13 +64,13 @@ func (s *localStorage) GetStats() error {
 	return nil
 }
 
-func (s *localStorage) SyncStatsOnTimer(timer time.Duration) error {
+func (s *localStorage) SyncOnTimer(timer time.Duration) error {
 	newTimer := time.NewTicker(timer)
 
 	go func() {
 		for {
 			<-newTimer.C
-			err := s.PutStats()
+			err := s.Put()
 			if err != nil {
 				log.Print("error putting stats")
 			}
