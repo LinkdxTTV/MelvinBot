@@ -13,6 +13,7 @@ import (
 
 	parse "MelvinBot/src/csv"
 	"MelvinBot/src/nisha"
+	"MelvinBot/src/quotes"
 	"MelvinBot/src/stats"
 	"MelvinBot/src/store"
 	"MelvinBot/src/util"
@@ -24,6 +25,7 @@ import (
 type Bot struct {
 	discord   *disc.Session
 	store     store.Storage
+	quotes    store.Storage
 	statsfile string
 }
 
@@ -39,11 +41,17 @@ func NewBot(token string) Bot {
 		log.Fatal("could not get local stats")
 	}
 
-	return Bot{discord, storage, statsFile}
+	quotes, err := store.NewLocalStorage(&quotes.GuildIDToQuoteDatabase, quotes.Filepath)
+	if err != nil {
+		log.Fatal("could not get quotes")
+	}
+
+	return Bot{discord, storage, quotes, statsFile}
 }
 
 func (bot Bot) RunBot() {
 
+	// Init stats
 	if _, err := os.Stat(bot.statsfile); errors.Is(err, os.ErrNotExist) {
 		bot.store.Put()
 	}
@@ -54,6 +62,18 @@ func (bot Bot) RunBot() {
 	}
 
 	bot.store.SyncOnTimer(1 * time.Minute)
+
+	// Init quotes
+	if _, err := os.Stat(quotes.Filepath); errors.Is(err, os.ErrNotExist) {
+		bot.quotes.Put()
+	}
+
+	err = bot.quotes.Get()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	bot.quotes.SyncOnTimer(1 * time.Minute)
 
 	// For scheduled jobs
 	c := cron.New()
@@ -77,6 +97,8 @@ func (bot Bot) RunBot() {
 	bot.discord.AddHandler(nisha.Iiwii)
 	bot.discord.AddHandler(nisha.Lethimcook)
 	bot.discord.AddHandler(nisha.Miami)
+	bot.discord.AddHandler(quotes.HandleQuote)
+	bot.discord.AddHandler(quotes.AddQuote)
 
 	err = bot.discord.Open()
 	if err != nil {
@@ -85,13 +107,18 @@ func (bot Bot) RunBot() {
 	// Wait here until CTRL-C or other term signal is received.
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
 	// Place stats one last time for consistency
 	err = bot.store.Put()
 	if err != nil {
-		log.Printf("failed dynamo put call on shutdown: %v", err)
+		log.Printf("failed put call on shutdown: %v", err)
+	}
+
+	err = bot.quotes.Put()
+	if err != nil {
+		log.Printf("failed put call on shutdown: %v", err)
 	}
 
 	c.Stop()
