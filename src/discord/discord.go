@@ -152,7 +152,8 @@ func randomQuote(s *disc.Session, m *disc.MessageCreate) {
 		return // only for nisha's discord
 	}
 
-	if m.Content != "!quote" {
+	// TODO INTREGRATE CSV INTO QUOTES
+	if m.Content != "!quotecsv" {
 		return
 	}
 
