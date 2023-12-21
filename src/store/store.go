@@ -1,7 +1,6 @@
 package store
 
 import (
-	stats "MelvinBot/src/stats"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,9 +17,10 @@ type Storage interface {
 
 type localStorage struct {
 	filename string
+	input    any
 }
 
-func NewLocalStorage(filename ...string) (*localStorage, error) {
+func NewLocalStorage(input any, filename ...string) (*localStorage, error) {
 	if len(filename) > 1 {
 		return nil, errors.New("cannot specify more than one filepath for local stoage")
 	}
@@ -31,11 +31,12 @@ func NewLocalStorage(filename ...string) (*localStorage, error) {
 
 	return &localStorage{
 		filename: filename[0],
+		input:    input,
 	}, nil
 }
 
 func (s *localStorage) Put() error {
-	statsAsJson, err := json.Marshal(stats.StatsPerGuild)
+	statsAsJson, err := json.Marshal(s.input)
 	if err != nil {
 		return err
 	}
@@ -56,10 +57,10 @@ func (s *localStorage) Get() error {
 	if err != nil {
 		return errors.New("could not read local stats file")
 	}
-	newStats := stats.StatsPerGuild
+	newStats := s.input
 	err = json.Unmarshal(bytes, &newStats)
 	if err != nil {
-		return errors.New(fmt.Sprintf("error unmarshaling, %v", err))
+		return fmt.Errorf("error unmarshaling, %v", err)
 	}
 	return nil
 }

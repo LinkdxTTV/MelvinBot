@@ -12,6 +12,7 @@ import (
 	"time"
 
 	parse "MelvinBot/src/csv"
+	"MelvinBot/src/nisha"
 	"MelvinBot/src/stats"
 	"MelvinBot/src/store"
 	"MelvinBot/src/util"
@@ -33,7 +34,7 @@ func NewBot(token string) Bot {
 	}
 
 	statsFile := "/etc/melvinstats"
-	storage, err := store.NewLocalStorage(statsFile)
+	storage, err := store.NewLocalStorage(&stats.StatsPerGuild, statsFile)
 	if err != nil {
 		log.Fatal("could not get local stats")
 	}
@@ -67,15 +68,15 @@ func (bot Bot) RunBot() {
 	bot.discord.AddHandler(stats.PrintStats)
 	bot.discord.AddHandler(pinFromReaction)
 	bot.discord.AddHandler(unpinFromReaction)
-	bot.discord.AddHandler(didSomebodySaySex)
-	bot.discord.AddHandler(thisIsNotADvd)
-	bot.discord.AddHandler(georgeCarlin)
-	bot.discord.AddHandler(tetazoo)
-	bot.discord.AddHandler(glounge)
-	bot.discord.AddHandler(iiwii)
-	bot.discord.AddHandler(lethimcook)
 	bot.discord.AddHandler(randomQuote)
-	bot.discord.AddHandler(miami)
+	bot.discord.AddHandler(nisha.DidSomebodySaySex)
+	bot.discord.AddHandler(nisha.ThisIsNotADvd)
+	bot.discord.AddHandler(nisha.GeorgeCarlin)
+	bot.discord.AddHandler(nisha.Tetazoo)
+	bot.discord.AddHandler(nisha.Glounge)
+	bot.discord.AddHandler(nisha.Iiwii)
+	bot.discord.AddHandler(nisha.Lethimcook)
+	bot.discord.AddHandler(nisha.Miami)
 
 	err = bot.discord.Open()
 	if err != nil {
@@ -110,107 +111,6 @@ func monkaS(s *disc.Session, m *disc.MessageCreate) {
 	}
 }
 
-func didSomebodySaySex(s *disc.Session, m *disc.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
-		return // it me
-	}
-
-	if m.GuildID != util.Wolfcord_id {
-		return // only for nisha's discord
-	}
-
-	if strings.Contains(strings.ToLower(m.Message.Content), "sex") {
-		s.ChannelMessageSend(m.ChannelID, "did somebody say sex???")
-	}
-}
-
-func thisIsNotADvd(s *disc.Session, m *disc.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
-		return // it me
-	}
-
-	if m.GuildID != util.Wolfcord_id {
-		return // only for nisha's discord
-	}
-
-	if m.Content != "!stop" {
-		return
-	}
-
-	s.ChannelMessageSend(m.ChannelID, "STOP! STOP! STOP! This is NOT a DVD. This is NOT A DVD. THIS IS NOT A DVD. This is a BACKER CARD. It's a CARD for COLLECTORS. This is a MOVIE CARD. THIS IS NOT A DVD. STOP! READ. READ THE DESCRIPTION.")
-
-}
-
-func georgeCarlin(s *disc.Session, m *disc.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
-		return // it me
-	}
-
-	if m.GuildID != util.Wolfcord_id {
-		return // only for nisha's discord
-	}
-
-	if m.Content != "!rsbs" {
-		return
-	}
-
-	s.ChannelMessageSend(m.ChannelID, "RATSHIT BATSHIT DIRTY OLD TWAT 69 ASSHOLES TIED IN A KNOT HOORAY LIZARD SHIT FUCK")
-}
-
-func tetazoo(s *disc.Session, m *disc.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
-		return // it me
-	}
-
-	if m.GuildID != util.Wolfcord_id {
-		return // only for nisha's discord
-	}
-
-	if strings.Contains(strings.ToLower(m.Message.Content), "tetazoo") {
-		s.ChannelMessageSend(m.ChannelID, "TETAZOO IS NOT A HIVEMIND")
-	}
-}
-
-func glounge(s *disc.Session, m *disc.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
-		return // it me
-	}
-
-	if m.GuildID != util.Wolfcord_id {
-		return // only for nisha's discord
-	}
-
-	if strings.Contains(strings.ToLower(m.Message.Content), "where are you") {
-		s.ChannelMessageSend(m.ChannelID, "update tetazoo glounge")
-	}
-}
-
-func iiwii(s *disc.Session, m *disc.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
-		return // it me
-	}
-
-	if m.Content != "!iiwii" {
-		return
-	}
-
-	s.ChannelMessageSend(m.ChannelID, "it EEEEEEES what it eees")
-}
-
-func lethimcook(s *disc.Session, m *disc.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
-		return // it me
-	}
-
-	if m.GuildID != util.Wolfcord_id {
-		return // only for nisha's discord
-	}
-
-	if strings.Contains(strings.ToLower(m.Message.Content), "cook") {
-		s.ChannelMessageSend(m.ChannelID, "https://i.kym-cdn.com/entries/icons/original/000/041/943/1aa1blank.png")
-	}
-}
-
 func sendRandomQuote(s *disc.Session, channelID string) {
 	allQuotes, _ := parse.ParseAndDedupCsv()
 	s.ChannelMessageSend(channelID, allQuotes[rand.Intn(len(allQuotes))])
@@ -230,20 +130,4 @@ func randomQuote(s *disc.Session, m *disc.MessageCreate) {
 	}
 
 	sendRandomQuote(s, m.ChannelID)
-}
-
-func miami(s *disc.Session, m *disc.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
-		return // it me
-	}
-
-	if m.GuildID != util.Wolfcord_id {
-		return // only for nisha's discord
-	}
-
-	if strings.Contains(strings.ToLower(m.Message.Content), "miami") || strings.Contains(strings.ToLower(m.Message.Content), "spring break") {
-		year := []rune(fmt.Sprint(time.Now().Year()))
-		year[1] = 'k'
-		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("SPRING BREAK MIAMI %v WOOOOOOOO", string(year)))
-	}
 }
