@@ -9,7 +9,7 @@ import (
 	disc "github.com/bwmarrin/discordgo"
 )
 
-func didSomebodySaySex(s *disc.Session, m *disc.MessageCreate) {
+func DidSomebodySaySex(s *disc.Session, m *disc.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return // it me
 	}
@@ -23,7 +23,7 @@ func didSomebodySaySex(s *disc.Session, m *disc.MessageCreate) {
 	}
 }
 
-func thisIsNotADvd(s *disc.Session, m *disc.MessageCreate) {
+func ThisIsNotADvd(s *disc.Session, m *disc.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return // it me
 	}
@@ -40,7 +40,7 @@ func thisIsNotADvd(s *disc.Session, m *disc.MessageCreate) {
 
 }
 
-func georgeCarlin(s *disc.Session, m *disc.MessageCreate) {
+func GeorgeCarlin(s *disc.Session, m *disc.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return // it me
 	}
@@ -56,7 +56,7 @@ func georgeCarlin(s *disc.Session, m *disc.MessageCreate) {
 	s.ChannelMessageSend(m.ChannelID, "RATSHIT BATSHIT DIRTY OLD TWAT 69 ASSHOLES TIED IN A KNOT HOORAY LIZARD SHIT FUCK")
 }
 
-func tetazoo(s *disc.Session, m *disc.MessageCreate) {
+func Tetazoo(s *disc.Session, m *disc.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return // it me
 	}
@@ -70,7 +70,7 @@ func tetazoo(s *disc.Session, m *disc.MessageCreate) {
 	}
 }
 
-func glounge(s *disc.Session, m *disc.MessageCreate) {
+func Glounge(s *disc.Session, m *disc.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return // it me
 	}
@@ -84,7 +84,7 @@ func glounge(s *disc.Session, m *disc.MessageCreate) {
 	}
 }
 
-func iiwii(s *disc.Session, m *disc.MessageCreate) {
+func Iiwii(s *disc.Session, m *disc.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return // it me
 	}
@@ -96,7 +96,7 @@ func iiwii(s *disc.Session, m *disc.MessageCreate) {
 	s.ChannelMessageSend(m.ChannelID, "it EEEEEEES what it eees")
 }
 
-func lethimcook(s *disc.Session, m *disc.MessageCreate) {
+func Lethimcook(s *disc.Session, m *disc.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return // it me
 	}
@@ -110,7 +110,7 @@ func lethimcook(s *disc.Session, m *disc.MessageCreate) {
 	}
 }
 
-func miami(s *disc.Session, m *disc.MessageCreate) {
+func Miami(s *disc.Session, m *disc.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return // it me
 	}
