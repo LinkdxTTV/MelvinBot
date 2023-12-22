@@ -8,10 +8,10 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
-	parse "MelvinBot/src/csv"
 	"MelvinBot/src/nisha"
 	"MelvinBot/src/quotes"
 	"MelvinBot/src/stats"
@@ -79,7 +79,7 @@ func (bot Bot) RunBot() {
 	c := cron.New()
 	// Send quote at 8:00AM every day
 	quoteBoardChannelID := "1093406748783693854"
-	c.AddFunc("0 0 8 * * *", func() { sendRandomQuote(bot.discord, quoteBoardChannelID) })
+	c.AddFunc("0 0 8 * * *", func() { sendRandomQuote(bot.discord, quoteBoardChannelID, util.Wolfcord_GuildID) })
 	c.Start()
 
 	// Add handlers here
@@ -88,7 +88,6 @@ func (bot Bot) RunBot() {
 	bot.discord.AddHandler(stats.PrintStats)
 	bot.discord.AddHandler(pinFromReaction)
 	bot.discord.AddHandler(unpinFromReaction)
-	bot.discord.AddHandler(randomQuote)
 	bot.discord.AddHandler(nisha.DidSomebodySaySex)
 	bot.discord.AddHandler(nisha.ThisIsNotADvd)
 	bot.discord.AddHandler(nisha.GeorgeCarlin)
@@ -138,24 +137,25 @@ func monkaS(s *disc.Session, m *disc.MessageCreate) {
 	}
 }
 
-func sendRandomQuote(s *disc.Session, channelID string) {
-	allQuotes, _ := parse.ParseAndDedupCsv()
-	s.ChannelMessageSend(channelID, allQuotes[rand.Intn(len(allQuotes))])
-}
-
-func randomQuote(s *disc.Session, m *disc.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
-		return // it me
+func sendRandomQuote(s *disc.Session, channelID string, guildID string) {
+	database, ok := quotes.GuildIDToQuoteDatabase[guildID]
+	// Just in case we never have init'd quotes in this server
+	if !ok {
+		newDatabase := &quotes.QuoteDatabase{
+			Quotes:                      []quotes.Quote{},
+			MapFromAuthorToQuoteIndices: map[string][]int{},
+			Lock:                        &sync.Mutex{},
+		}
+		quotes.GuildIDToQuoteDatabase[guildID] = newDatabase
+		database = newDatabase
 	}
+	database.Lock.Lock()
+	defer database.Lock.Unlock()
 
-	if m.GuildID != util.Wolfcord_id {
-		return // only for nisha's discord
-	}
-
-	// TODO INTREGRATE CSV INTO QUOTES
-	if m.Content != "!quotecsv" {
+	totalQuotes := len(database.Quotes)
+	if totalQuotes == 0 {
 		return
 	}
 
-	sendRandomQuote(s, m.ChannelID)
+	database.SendQuote(s, channelID, rand.Intn(totalQuotes), totalQuotes)
 }

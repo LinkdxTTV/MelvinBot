@@ -1,3 +1,3 @@
 package util
 
-const Wolfcord_id = "1084972888374919211"
+const Wolfcord_GuildID = "1084972888374919211"

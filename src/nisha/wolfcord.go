@@ -14,7 +14,7 @@ func DidSomebodySaySex(s *disc.Session, m *disc.MessageCreate) {
 		return // it me
 	}
 
-	if m.GuildID != util.Wolfcord_id {
+	if m.GuildID != util.Wolfcord_GuildID {
 		return // only for nisha's discord
 	}
 
@@ -28,7 +28,7 @@ func ThisIsNotADvd(s *disc.Session, m *disc.MessageCreate) {
 		return // it me
 	}
 
-	if m.GuildID != util.Wolfcord_id {
+	if m.GuildID != util.Wolfcord_GuildID {
 		return // only for nisha's discord
 	}
 
@@ -45,7 +45,7 @@ func GeorgeCarlin(s *disc.Session, m *disc.MessageCreate) {
 		return // it me
 	}
 
-	if m.GuildID != util.Wolfcord_id {
+	if m.GuildID != util.Wolfcord_GuildID {
 		return // only for nisha's discord
 	}
 
@@ -61,7 +61,7 @@ func Tetazoo(s *disc.Session, m *disc.MessageCreate) {
 		return // it me
 	}
 
-	if m.GuildID != util.Wolfcord_id {
+	if m.GuildID != util.Wolfcord_GuildID {
 		return // only for nisha's discord
 	}
 
@@ -75,7 +75,7 @@ func Glounge(s *disc.Session, m *disc.MessageCreate) {
 		return // it me
 	}
 
-	if m.GuildID != util.Wolfcord_id {
+	if m.GuildID != util.Wolfcord_GuildID {
 		return // only for nisha's discord
 	}
 
@@ -101,7 +101,7 @@ func Lethimcook(s *disc.Session, m *disc.MessageCreate) {
 		return // it me
 	}
 
-	if m.GuildID != util.Wolfcord_id {
+	if m.GuildID != util.Wolfcord_GuildID {
 		return // only for nisha's discord
 	}
 
@@ -115,7 +115,7 @@ func Miami(s *disc.Session, m *disc.MessageCreate) {
 		return // it me
 	}
 
-	if m.GuildID != util.Wolfcord_id {
+	if m.GuildID != util.Wolfcord_GuildID {
 		return // only for nisha's discord
 	}
 

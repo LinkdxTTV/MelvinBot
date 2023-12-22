@@ -1,12 +1,14 @@
 package quotes
 
 import (
+	"MelvinBot/src/util"
 	"fmt"
 	"log"
 	"math/rand"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	disc "github.com/bwmarrin/discordgo"
 )
@@ -16,6 +18,7 @@ const Filepath string = "/home/nelly/apps/bot/melvinquotes"
 type QuoteDatabase struct {
 	Quotes                      []Quote
 	MapFromAuthorToQuoteIndices map[string][]int
+	QuoteGraveyard              []int // The quote graveyard is a list of indexes where we have deleted quotes but do not want to reorder the array
 	Lock                        *sync.Mutex
 }
 
@@ -59,6 +62,15 @@ func AddQuote(s *disc.Session, m *disc.MessageReactionAdd) {
 		return
 	}
 
+	newQuoteID := AddQuoteToDatabase(guildID, message.Content, message.Author.Username, message.Author.ID)
+	// Finally ack
+	err = util.SendSelfDestructingMessage(s, m.ChannelID, fmt.Sprintf("Added quote [#%d]: ```%s``` -%s", newQuoteID, message.Content, message.Author.Username), 10*time.Second)
+	if err != nil {
+		log.Printf("err sending self destructing msg: %v", err)
+	}
+}
+
+func AddQuoteToDatabase(guildID string, quote string, author string, userID string) int {
 	// Just in case we have never made a quote for this guild?
 	database, ok := GuildIDToQuoteDatabase[guildID]
 	if !ok {
@@ -74,21 +86,19 @@ func AddQuote(s *disc.Session, m *disc.MessageReactionAdd) {
 	defer database.Lock.Unlock()
 
 	database.Quotes = append(database.Quotes, Quote{
-		Quote:  message.Content,
-		Author: message.Author.Username,
-		UserID: message.Author.ID,
+		Quote:  quote,
+		Author: author,
+		UserID: userID,
 	})
 
 	// Save by username as well
-	_, ok = database.MapFromAuthorToQuoteIndices[message.Author.Username]
+	_, ok = database.MapFromAuthorToQuoteIndices[author]
 	if !ok {
-		database.MapFromAuthorToQuoteIndices[message.Author.Username] = []int{}
-
-		database.MapFromAuthorToQuoteIndices[message.Author.Username] = append(database.MapFromAuthorToQuoteIndices[message.Author.Username], len(database.Quotes)-1)
-
-		// Finally ack
-		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("New quote added at number %d", len(database.Quotes)-1))
+		database.MapFromAuthorToQuoteIndices[author] = []int{}
 	}
+	database.MapFromAuthorToQuoteIndices[author] = append(database.MapFromAuthorToQuoteIndices[author], len(database.Quotes)-1)
+
+	return len(database.Quotes) - 1
 }
 
 // TODO
@@ -151,7 +161,7 @@ func HandleQuote(s *disc.Session, m *disc.MessageCreate) {
 
 	totalQuotes := len(database.Quotes)
 	if totalQuotes == 0 {
-		_, err := s.ChannelMessageSend(m.ChannelID, "This server has no saved quotes yet!")
+		err := util.SendSelfDestructingMessage(s, m.ChannelID, "This server has no saved quotes yet!", 10*time.Second)
 		if err != nil {
 			log.Printf("error sending message for random quote %v", err)
 		}
@@ -160,29 +170,29 @@ func HandleQuote(s *disc.Session, m *disc.MessageCreate) {
 
 	// Random quote
 	if m.Content == "!quote" {
-		database.sendQuote(s, m, rand.Intn(totalQuotes), totalQuotes)
+		database.SendQuote(s, m.ChannelID, rand.Intn(totalQuotes), totalQuotes)
 		return
 	}
 
 	split := strings.Split(m.Content, " ")
 	if len(split) != 2 {
 		// Ok they put in some true garbage
-		s.ChannelMessageSend(m.ChannelID, "You must specify a quote id (its a number) like !quote 5")
+		util.SendSelfDestructingMessage(s, m.ChannelID, "You must specify a quote id (its a number) like !quote 5", 5*time.Second)
 		return
 	}
 	quoteInt, err := strconv.Atoi(split[1])
 	if err != nil {
 		// They put in more garbage
-		s.ChannelMessageSend(m.ChannelID, "You must specify a quote id (its a number) like !quote 5")
+		util.SendSelfDestructingMessage(s, m.ChannelID, "You must specify a quote id (its a number) like !quote 5", 5*time.Second)
 		return
 	}
-	database.sendQuote(s, m, quoteInt, totalQuotes)
+	database.SendQuote(s, m.ChannelID, quoteInt, totalQuotes)
 }
 
-func (d *QuoteDatabase) sendQuote(s *disc.Session, m *disc.MessageCreate, index int, totalQuotes int) {
+func (d *QuoteDatabase) SendQuote(s *disc.Session, ChannelID string, index int, totalQuotes int) {
 
 	if index >= totalQuotes {
-		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Sorry we only have up to quote %d", totalQuotes-1))
+		util.SendSelfDestructingMessage(s, ChannelID, fmt.Sprintf("Sorry we only have up to quote %d", totalQuotes-1), 5*time.Second)
 		return
 	}
 
@@ -194,7 +204,7 @@ func (d *QuoteDatabase) sendQuote(s *disc.Session, m *disc.MessageCreate, index 
 		author = user.Mention()
 	}
 
-	_, err = s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Quote #%d: %s -%s", index, quote.Quote, author))
+	_, err = s.ChannelMessageSend(ChannelID, fmt.Sprintf("[#%d]: ```%s``` -%s", index, quote.Quote, author))
 	if err != nil {
 		log.Printf("error sending message for random quote %v", err)
 	}

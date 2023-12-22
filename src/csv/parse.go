@@ -1,13 +1,14 @@
 package parse
 
 import (
+	"MelvinBot/src/quotes"
 	"encoding/csv"
 	"fmt"
 	"os"
 )
 
-func ParseAndDedupCsv() ([]string, error) {
-	var allQuotes []string
+func ParseAndDedupCsv() ([]quotes.Quote, error) {
+	var allQuotes []quotes.Quote
 	csvFile, err := os.Open("/home/nelly/apps/bot/parsed_quotes.csv")
 	if err != nil {
 		fmt.Println(err)
@@ -26,11 +27,14 @@ func ParseAndDedupCsv() ([]string, error) {
 	for _, row := range csvRaw {
 		person = row[0]
 		quote = row[1]
-		if _, exists := quoteExistsMap[person]; exists {
+		if _, exists := quoteExistsMap[quote]; exists {
 			continue
 		} else {
-			quoteExistsMap[person] = true
-			allQuotes = append(allQuotes, fmt.Sprintf("```%v```~%v", quote, person))
+			quoteExistsMap[quote] = true
+			allQuotes = append(allQuotes, quotes.Quote{
+				Author: person,
+				Quote:  quote,
+			})
 		}
 	}
 	return allQuotes, err
