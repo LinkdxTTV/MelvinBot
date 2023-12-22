@@ -14,6 +14,7 @@ import (
 )
 
 const Filepath string = "/home/nelly/apps/bot/melvinquotes"
+const DeletedQuoteString = "This quote has been deleted"
 
 type QuoteDatabase struct {
 	Quotes                      []Quote
@@ -77,6 +78,7 @@ func AddQuoteToDatabase(guildID string, quote string, author string, userID stri
 		newDatabase := &QuoteDatabase{
 			Quotes:                      []Quote{},
 			MapFromAuthorToQuoteIndices: map[string][]int{},
+			QuoteGraveyard:              []int{},
 			Lock:                        &sync.Mutex{},
 		}
 		GuildIDToQuoteDatabase[guildID] = newDatabase
@@ -85,36 +87,58 @@ func AddQuoteToDatabase(guildID string, quote string, author string, userID stri
 	database.Lock.Lock()
 	defer database.Lock.Unlock()
 
-	database.Quotes = append(database.Quotes, Quote{
+	newQuote := Quote{
 		Quote:  quote,
 		Author: author,
 		UserID: userID,
-	})
+	}
+
+	quoteIndex := -1
+	if database.QuoteGraveyard == nil {
+		database.QuoteGraveyard = []int{}
+	}
+	if len(database.QuoteGraveyard) != 0 {
+		quoteIndex = database.QuoteGraveyard[0]
+		database.QuoteGraveyard = database.QuoteGraveyard[1:]
+	}
+
+	if quoteIndex != -1 {
+		database.Quotes[quoteIndex] = newQuote
+	} else {
+		database.Quotes = append(database.Quotes, newQuote)
+		quoteIndex = len(database.Quotes) - 1
+	}
 
 	// Save by username as well
-	_, ok = database.MapFromAuthorToQuoteIndices[author]
+	_, ok = database.MapFromAuthorToQuoteIndices[strings.ToLower(author)]
 	if !ok {
-		database.MapFromAuthorToQuoteIndices[author] = []int{}
+		database.MapFromAuthorToQuoteIndices[strings.ToLower(author)] = []int{}
 	}
-	database.MapFromAuthorToQuoteIndices[author] = append(database.MapFromAuthorToQuoteIndices[author], len(database.Quotes)-1)
+	database.MapFromAuthorToQuoteIndices[strings.ToLower(author)] = append(database.MapFromAuthorToQuoteIndices[strings.ToLower(author)], quoteIndex)
 
-	return len(database.Quotes) - 1
+	return quoteIndex
 }
 
-// TODO
-func RemoveQuote(s *disc.Session, m *disc.MessageReactionAdd) {
-	if m.MessageReaction.Emoji.Name != "💬" {
+func RemoveQuote(s *disc.Session, m *disc.MessageCreate) {
+	if m.Author.ID == s.State.User.ID {
+		return // it me
+	}
+
+	if !strings.Contains(m.Content, "!removequote") {
 		return
 	}
 
-	msg, err := s.ChannelMessage(m.ChannelID, m.MessageID)
-	if err != nil {
+	split := strings.Split(m.Content, " ")
+	if len(split) != 2 {
+		// Ok they put in some true garbage
+		util.SendSelfDestructingMessage(s, m.ChannelID, "You must specify a quote id (its a number) like !quote 5", 5*time.Second)
 		return
 	}
-	for _, reaction := range msg.Reactions {
-		if reaction.Emoji.Name == "💬" {
-			return
-		}
+	quoteInt, err := strconv.Atoi(split[1])
+	if err != nil {
+		// They put in more garbage
+		util.SendSelfDestructingMessage(s, m.ChannelID, "You must specify a quote id (its a number) like !quote 5", 5*time.Second)
+		return
 	}
 
 	database, ok := GuildIDToQuoteDatabase[m.GuildID]
@@ -122,6 +146,7 @@ func RemoveQuote(s *disc.Session, m *disc.MessageReactionAdd) {
 		newDatabase := &QuoteDatabase{
 			Quotes:                      []Quote{},
 			MapFromAuthorToQuoteIndices: map[string][]int{},
+			QuoteGraveyard:              []int{},
 			Lock:                        &sync.Mutex{},
 		}
 		GuildIDToQuoteDatabase[m.GuildID] = newDatabase
@@ -130,7 +155,30 @@ func RemoveQuote(s *disc.Session, m *disc.MessageReactionAdd) {
 	database.Lock.Lock()
 	defer database.Lock.Unlock()
 
-	// TODO
+	OriginalQuote := database.Quotes[quoteInt]
+	// Remove from that authors history
+	AuthorIndices, ok := database.MapFromAuthorToQuoteIndices[strings.ToLower(OriginalQuote.Author)]
+	if ok {
+		// Ok well its technically sorted but I wont rely on that, just hit the entire array
+		new := []int{}
+		for _, index := range AuthorIndices {
+			if index != quoteInt {
+				new = append(new, index)
+			}
+		}
+		database.MapFromAuthorToQuoteIndices[strings.ToLower(OriginalQuote.Author)] = new
+	}
+
+	database.Quotes[quoteInt] = Quote{
+		Quote: DeletedQuoteString,
+	}
+
+	if database.QuoteGraveyard == nil {
+		database.QuoteGraveyard = []int{}
+	}
+
+	database.QuoteGraveyard = append(database.QuoteGraveyard, quoteInt)
+	util.SendSelfDestructingMessage(s, m.ChannelID, fmt.Sprintf("Quote %d deleted successfully", quoteInt), 5*time.Second)
 }
 
 func HandleQuote(s *disc.Session, m *disc.MessageCreate) {
@@ -150,6 +198,7 @@ func HandleQuote(s *disc.Session, m *disc.MessageCreate) {
 		newDatabase := &QuoteDatabase{
 			Quotes:                      []Quote{},
 			MapFromAuthorToQuoteIndices: map[string][]int{},
+			QuoteGraveyard:              []int{},
 			Lock:                        &sync.Mutex{},
 		}
 		GuildIDToQuoteDatabase[guildID] = newDatabase
@@ -174,19 +223,36 @@ func HandleQuote(s *disc.Session, m *disc.MessageCreate) {
 		return
 	}
 
-	split := strings.Split(m.Content, " ")
+	split := strings.SplitN(m.Content, " ", 2)
 	if len(split) != 2 {
 		// Ok they put in some true garbage
-		util.SendSelfDestructingMessage(s, m.ChannelID, "You must specify a quote id (its a number) like !quote 5", 5*time.Second)
+		util.SendSelfDestructingMessage(s, m.ChannelID, "You must specify a quote id (its a number) or a name like !quote 5 or !quote jesus", 5*time.Second)
 		return
 	}
 	quoteInt, err := strconv.Atoi(split[1])
-	if err != nil {
-		// They put in more garbage
-		util.SendSelfDestructingMessage(s, m.ChannelID, "You must specify a quote id (its a number) like !quote 5", 5*time.Second)
+	if err == nil {
+		database.SendQuote(s, m.ChannelID, quoteInt, totalQuotes)
 		return
 	}
-	database.SendQuote(s, m.ChannelID, quoteInt, totalQuotes)
+	// Attempt to find the user?
+	authorQuoteIndices, ok := database.MapFromAuthorToQuoteIndices[strings.ToLower(split[1])]
+	if ok {
+		database.SendQuote(s, m.ChannelID, authorQuoteIndices[rand.Intn(len(authorQuoteIndices))], totalQuotes)
+		return
+	}
+	// Maybe its a mention?
+	userID := strings.TrimSuffix(strings.TrimPrefix(split[1], "<@"), ">")
+	user, err := s.User(userID)
+	if err == nil {
+		authorQuoteIndices, ok := database.MapFromAuthorToQuoteIndices[strings.ToLower(user.Username)]
+		if ok {
+			database.SendQuote(s, m.ChannelID, authorQuoteIndices[rand.Intn(len(authorQuoteIndices))], totalQuotes)
+			return
+		}
+	}
+	// Nothing we can do
+	util.SendSelfDestructingMessage(s, m.ChannelID, "You must specify a quote id (its a number) or a name like !quote 5 or !quote jesus", 5*time.Second)
+
 }
 
 func (d *QuoteDatabase) SendQuote(s *disc.Session, ChannelID string, index int, totalQuotes int) {

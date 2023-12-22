@@ -98,6 +98,7 @@ func (bot Bot) RunBot() {
 	bot.discord.AddHandler(nisha.Miami)
 	bot.discord.AddHandler(quotes.HandleQuote)
 	bot.discord.AddHandler(quotes.AddQuote)
+	bot.discord.AddHandler(quotes.RemoveQuote)
 
 	err = bot.discord.Open()
 	if err != nil {
