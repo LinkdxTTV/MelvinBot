@@ -112,7 +112,7 @@ func (j *JellyUpdater) SendUpdateMessage(channelID string) {
 
 	MovieString := "**Movies**\n"
 	TVString := "**TV Shows**\n"
-	medias, err := j.GetRecentMediaSince(time.Now().Add(-1 * 48 * time.Hour)) // Daily
+	medias, err := j.GetRecentMediaSince(time.Now().Add(-1 * 24 * time.Hour)) // Daily
 	if err != nil {
 		log.Println("failed to get recent media")
 		return
@@ -136,6 +136,10 @@ func (j *JellyUpdater) SendUpdateMessage(channelID string) {
 	}
 	if tvUpdates == 0 {
 		TVString = ""
+	}
+	if movieUpdates == 0 && tvUpdates == 0 {
+		// Nothing to do
+		return
 	}
 
 	StringTemplate := fmt.Sprintf(`**New on Jellyfin Since Yesterday**
