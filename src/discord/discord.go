@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"MelvinBot/src/jellyfin"
 	"MelvinBot/src/nisha"
 	"MelvinBot/src/quotes"
 	"MelvinBot/src/stats"
@@ -74,12 +75,16 @@ func (bot Bot) RunBot() {
 	}
 
 	bot.quotes.SyncOnTimer(1 * time.Minute)
-
+	jf := jellyfin.NewJellyUpdater(bot.discord)
 	// For scheduled jobs
 	c := cron.New()
 	// Send quote at 8:00AM every day
 	quoteBoardChannelID := "1093406748783693854"
-	c.AddFunc("0 0 8 * * *", func() { sendRandomQuote(bot.discord, quoteBoardChannelID, util.Wolfcord_GuildID) })
+	c.AddFunc("0 0 8 * * *", func() { sendRandomQuote(bot.discord, quoteBoardChannelID, util.Wolfcord_GuildID) }) // Magic bullshit that puts it at midnight PST
+	for _, channel := range jellyfin.JellyfinUpdateChannels {
+		c.AddFunc("0 0 1 * * *", func() { jf.SendUpdateMessage(channel) })
+	}
+
 	c.Start()
 
 	// Add handlers here
@@ -99,6 +104,7 @@ func (bot Bot) RunBot() {
 	bot.discord.AddHandler(quotes.HandleQuote)
 	bot.discord.AddHandler(quotes.AddQuote)
 	bot.discord.AddHandler(quotes.RemoveQuote)
+	bot.discord.AddHandler(jf.RecentHandler)
 
 	err = bot.discord.Open()
 	if err != nil {
