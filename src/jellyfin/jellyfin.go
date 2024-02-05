@@ -110,6 +110,8 @@ func (j *JellyUpdater) SendUpdateMessage(channelID string) {
 		return
 	}
 
+	log.Printf("Posting to channel %s", channelID)
+
 	MovieString := "**Movies**\n"
 	TVString := "**TV Shows**\n"
 	medias, err := j.GetRecentMediaSince(time.Now().Add(-1 * 24 * time.Hour)) // Daily
@@ -174,4 +176,9 @@ func (j *JellyUpdater) RecentHandler(s *discordgo.Session, m *discordgo.MessageC
 	}
 
 	j.SendUpdateMessage(m.ChannelID)
+}
+
+// Im not smart enough to understand why we need this closure
+func (j *JellyUpdater) SendUpdateMessageToChannel(channelID string) func() {
+	return func() { j.SendUpdateMessage(channelID) }
 }
