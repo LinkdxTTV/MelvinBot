@@ -82,7 +82,7 @@ func (bot Bot) RunBot() {
 	quoteBoardChannelID := "1093406748783693854"
 	c.AddFunc("0 0 8 * * *", func() { sendRandomQuote(bot.discord, quoteBoardChannelID, util.Wolfcord_GuildID) }) // Magic bullshit that puts it at midnight PST
 	for _, channel := range jellyfin.JellyfinUpdateChannels {
-		c.AddFunc("0 0 1 * * *", func() { jf.SendUpdateMessageToChannel(channel) })
+		c.AddFunc("0 0 1 * * *", jf.SendUpdateMessageToChannel(channel))
 	}
 
 	c.Start()
