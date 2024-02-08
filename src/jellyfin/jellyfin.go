@@ -31,6 +31,12 @@ type JellyMedia struct {
 	Type               string
 	ChildCount         int
 	ProductionYear     int
+	Id                 string
+}
+
+type TVEpisodes struct {
+	Items  []JellyMedia
+	Series string
 }
 
 func NewJellyUpdater(disc *discordgo.Session) *JellyUpdater {
@@ -47,14 +53,16 @@ func NewJellyUpdater(disc *discordgo.Session) *JellyUpdater {
 }
 
 // We absolutely assume jellyfin is running locally at http://localhost:8096/jelly btw
-func (j *JellyUpdater) GetRecentMediaSince(timeSince time.Time) ([]JellyMedia, error) {
+func (j *JellyUpdater) GetRecentMediaSince(timeSince time.Time) ([]JellyMedia, []TVEpisodes, error) {
 	recentMediaEndpoint := fmt.Sprintf("http://localhost:8096/jelly/Users/%s/Items/Latest?fields=DateLastMediaAdded,DateCreated&enableImages=false&enableUserData=false", j.userID)
 
 	url, err := url.Parse(recentMediaEndpoint)
 	if err != nil {
 		log.Println("failed to parse jellyfin recent media url", err)
-		return nil, err
+		return nil, nil, err
 	}
+
+	var AuthorizationHeader []string = []string{fmt.Sprintf("MediaBrowser Client=\"Jellyfin Web\", Device=\"Firefox\", DeviceId=\"abcdefg\", Version=\"10.7.6\", Token=\"%s\"", j.apiKey)}
 
 	client := http.Client{}
 	resp, err := client.Do(
@@ -62,47 +70,46 @@ func (j *JellyUpdater) GetRecentMediaSince(timeSince time.Time) ([]JellyMedia, e
 			Method: http.MethodGet,
 			URL:    url,
 			Header: http.Header{
-				"Authorization": []string{fmt.Sprintf("MediaBrowser Client=\"Jellyfin Web\", Device=\"Firefox\", DeviceId=\"abcdefg\", Version=\"10.7.6\", Token=\"%s\"", j.apiKey)},
+				"Authorization": AuthorizationHeader,
 			},
 		},
 	)
 	if err != nil {
 		log.Println("failed to make http req", err)
-		return nil, err
+		return nil, nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
 		log.Println("failed to make http req, got invalid status code", resp.StatusCode)
-		return nil, err
+		return nil, nil, err
 	}
 
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Println("could not read response body", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	medias := []JellyMedia{}
 	err = json.Unmarshal(b, &medias)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	output := []JellyMedia{}
+	movies := []JellyMedia{}
+	tvshows := []TVEpisodes{}
 	// Filter by time
 	for _, media := range medias {
 		switch media.Type {
 		case "Movie":
 			if media.DateCreated.After(timeSince) {
-				output = append(output, media)
+				movies = append(movies, media)
 			}
 		case "Series":
-			if media.DateLastMediaAdded.After(timeSince) {
-				output = append(output, media)
-			}
+			tvshows = append(tvshows, j.GetTVSeriesWithEpisodes(media.Name, media.Id, timeSince))
 		}
 	}
 
-	return output, nil
+	return movies, tvshows, nil
 }
 
 func (j *JellyUpdater) SendUpdateMessage(channelID string) {
@@ -114,7 +121,7 @@ func (j *JellyUpdater) SendUpdateMessage(channelID string) {
 
 	MovieString := "**Movies**\n"
 	TVString := "**TV Shows**\n"
-	medias, err := j.GetRecentMediaSince(time.Now().Add(-1 * 24 * time.Hour)) // Daily
+	movies, tvshows, err := j.GetRecentMediaSince(time.Now().Add(-1 * 24 * time.Hour)) // Daily
 	if err != nil {
 		log.Println("failed to get recent media")
 		return
@@ -122,13 +129,14 @@ func (j *JellyUpdater) SendUpdateMessage(channelID string) {
 
 	movieUpdates := 0
 	tvUpdates := 0
-	for _, media := range medias {
-		switch media.Type {
-		case "Movie":
-			MovieString += media.Name + fmt.Sprintf(" (%d) ", media.ProductionYear) + "\n"
-			movieUpdates++
-		case "Series":
-			TVString += media.Name + fmt.Sprintf(" (%d) ", media.ProductionYear) + fmt.Sprintf(" [New Episode Count: %d] ", media.ChildCount) + "\n"
+	for _, media := range movies {
+		MovieString += media.Name + fmt.Sprintf(" (%d) ", media.ProductionYear) + "\n"
+		movieUpdates++
+	}
+
+	for _, show := range tvshows {
+		if len(show.Items) != 0 {
+			TVString += show.Series + fmt.Sprintf(" (%d)", show.Items[0].ProductionYear) + fmt.Sprintf(" [ %d New Episode(s) ] ", len(show.Items)) + "\n"
 			tvUpdates++
 		}
 	}
@@ -153,6 +161,59 @@ func (j *JellyUpdater) SendUpdateMessage(channelID string) {
 	if err != nil {
 		log.Println("err sending jellyfin update message", err)
 	}
+}
+
+func (j *JellyUpdater) GetTVSeriesWithEpisodes(seriesName string, seriesID string, since time.Time) TVEpisodes {
+	EpisodesEndpoint := fmt.Sprintf("http://localhost:8096/jelly/Shows/%s/Episodes?fields=DateCreated", seriesID)
+	url, err := url.Parse(EpisodesEndpoint)
+	if err != nil {
+		log.Println("couldnt parse url", EpisodesEndpoint)
+		return TVEpisodes{}
+	}
+
+	var AuthorizationHeader []string = []string{fmt.Sprintf("MediaBrowser Client=\"Jellyfin Web\", Device=\"Firefox\", DeviceId=\"abcdefg\", Version=\"10.7.6\", Token=\"%s\"", j.apiKey)}
+
+	client := &http.Client{}
+	resp, err := client.Do(&http.Request{
+		Method: http.MethodGet,
+		URL:    url,
+		Header: http.Header{
+			"Authorization": AuthorizationHeader,
+		},
+	})
+
+	if err != nil {
+		log.Println("err getting episodes", err)
+		return TVEpisodes{}
+	}
+	if resp.StatusCode != http.StatusOK {
+		log.Println("err with request for episodes of series id", seriesID)
+		return TVEpisodes{}
+	}
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Println("err reading resp when grabbing episodes", err)
+		return TVEpisodes{}
+	}
+	seriesAndEpisodes := TVEpisodes{Series: seriesName}
+
+	err = json.Unmarshal(b, &seriesAndEpisodes)
+	if err != nil {
+		log.Println("err unmarshaling episodes", err)
+		return TVEpisodes{}
+	}
+
+	// Lets filter at this point
+	temp := []JellyMedia{}
+	for _, item := range seriesAndEpisodes.Items {
+		if item.DateCreated.After(since) {
+			temp = append(temp, item)
+		}
+	}
+	seriesAndEpisodes.Items = temp
+
+	return seriesAndEpisodes
 }
 
 func (j *JellyUpdater) RecentHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
