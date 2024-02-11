@@ -40,6 +40,16 @@ func AddQuote(s *disc.Session, m *disc.MessageReactionAdd) {
 		return
 	}
 
+	message, err := s.ChannelMessage(m.ChannelID, m.MessageID)
+	if err != nil {
+		// We cant find the message that was just reacted to?
+		return
+	}
+	if message.Author.ID == s.State.User.ID {
+		// Disallows melvinbot from saving quotes from himself
+		return
+	}
+
 	// Dedupe quotes
 	msg, err := s.ChannelMessage(m.ChannelID, m.MessageID)
 	if err != nil {
@@ -57,7 +67,7 @@ func AddQuote(s *disc.Session, m *disc.MessageReactionAdd) {
 	}
 
 	guildID := m.GuildID
-	message, err := s.ChannelMessage(m.ChannelID, m.MessageID)
+	message, err = s.ChannelMessage(m.ChannelID, m.MessageID)
 	if err != nil {
 		log.Printf("error setting quote, could not get message for %s, %s: %v", m.ChannelID, m.MessageID, err)
 		return
