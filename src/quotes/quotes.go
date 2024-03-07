@@ -50,6 +50,7 @@ func AddQuote(s *disc.Session, m *disc.MessageReactionAdd) {
 		return
 	}
 
+	// Dedupe quotes
 	for _, reaction := range message.Reactions {
 		if reaction.Emoji.Name == "💬" {
 			if reaction.Count > 1 {
@@ -58,7 +59,15 @@ func AddQuote(s *disc.Session, m *disc.MessageReactionAdd) {
 		}
 	}
 
+	// Disallow abuse via reacting and unreacting quote over and over.. but this only checks the last quote
 	guildID := m.GuildID
+	db, ok := GuildIDToQuoteDatabase[guildID]
+	if ok {
+		lastQuote := db.Quotes[len(db.Quotes)-1]
+		if lastQuote.Quote == message.Content {
+			return
+		}
+	}
 
 	newQuoteID := AddQuoteToDatabase(guildID, message.Content, message.Author.Username, message.Author.ID)
 	// Finally ack
