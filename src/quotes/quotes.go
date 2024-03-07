@@ -50,28 +50,15 @@ func AddQuote(s *disc.Session, m *disc.MessageReactionAdd) {
 		return
 	}
 
-	// Dedupe quotes
-	msg, err := s.ChannelMessage(m.ChannelID, m.MessageID)
-	if err != nil {
-		return
-	}
-	numQuotes := 0
-	for _, reaction := range msg.Reactions {
+	for _, reaction := range message.Reactions {
 		if reaction.Emoji.Name == "💬" {
-			numQuotes++
-			if numQuotes > 1 {
-				// Duplicate
+			if reaction.Count > 1 {
 				return
 			}
 		}
 	}
 
 	guildID := m.GuildID
-	message, err = s.ChannelMessage(m.ChannelID, m.MessageID)
-	if err != nil {
-		log.Printf("error setting quote, could not get message for %s, %s: %v", m.ChannelID, m.MessageID, err)
-		return
-	}
 
 	newQuoteID := AddQuoteToDatabase(guildID, message.Content, message.Author.Username, message.Author.ID)
 	// Finally ack
