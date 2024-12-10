@@ -136,10 +136,6 @@ func CheckMatchesForTeamAndCreateReminderTimers(disc *discordgo.Session, team st
 			log.Printf("failed to parse match time from %+v \n", *match.StartsAt)
 		}
 
-		if time.Now().After(matchTime) {
-			continue
-		}
-
 		var opponent string
 		if *match.Teams[0].Name == team {
 			opponent = *match.Teams[1].Name
@@ -210,7 +206,12 @@ func HandleDota2Matches(s *discordgo.Session, m *discordgo.MessageCreate) {
 			})
 
 			for _, oppTime := range sortable {
-				content += fmt.Sprintf("against **%s** at %s (in %s) \n", oppTime.opponent, oppTime.matchTime.In(fixedPST).Format(time.RFC1123), fmtDuration(time.Until(oppTime.matchTime)))
+				if time.Now().Add(-2*time.Hour).Before(oppTime.matchTime) && time.Now().After(oppTime.matchTime) {
+					content += fmt.Sprintf("[**Possibly Live**] against **%s** at %s (%s ago) \n", oppTime.opponent, oppTime.matchTime.In(fixedPST).Format(time.RFC1123), fmtDuration(time.Until(oppTime.matchTime)))
+				}
+				if time.Now().Before(oppTime.matchTime) {
+					content += fmt.Sprintf("against **%s** at %s (in %s) \n", oppTime.opponent, oppTime.matchTime.In(fixedPST).Format(time.RFC1123), fmtDuration(time.Until(oppTime.matchTime)))
+				}
 			}
 		}
 		s.ChannelMessageSend(m.ChannelID, content)
