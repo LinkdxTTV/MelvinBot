@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"MelvinBot/src/dota2matchreminder"
 	"MelvinBot/src/jellyfin"
 	"MelvinBot/src/nisha"
 	"MelvinBot/src/quotes"
@@ -87,6 +88,11 @@ func (bot Bot) RunBot() {
 
 	c.Start()
 
+	err = dota2matchreminder.StartDota2MatchReminder(bot.discord)
+	if err != nil {
+		log.Println("error in dota 2 match reminder", err)
+	}
+
 	// Add handlers here
 	bot.discord.AddHandler(monkaS)
 	bot.discord.AddHandler(stats.TrackStats)
@@ -105,6 +111,7 @@ func (bot Bot) RunBot() {
 	bot.discord.AddHandler(quotes.AddQuote)
 	bot.discord.AddHandler(quotes.RemoveQuote)
 	bot.discord.AddHandler(jf.RecentHandler)
+	bot.discord.AddHandler(dota2matchreminder.HandleDota2Matches)
 
 	err = bot.discord.Open()
 	if err != nil {
