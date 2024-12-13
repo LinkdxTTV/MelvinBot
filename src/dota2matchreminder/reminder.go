@@ -113,14 +113,14 @@ func GetAndCacheMatchesAndSetUpReminders(disc *discordgo.Session) error {
 }
 
 func CheckMatchesForTeamAndCreateReminderTimers(disc *discordgo.Session, team string) {
+	tbd := "TBD"
 	for _, match := range cachedMatches {
-		if len(match.Teams) != 2 {
-			// What is this match
-			continue
+
+		if match.Teams[0].Name == nil {
+			match.Teams[0].Name = &tbd
 		}
-		if match.Teams[0].Name == nil || match.Teams[1].Name == nil {
-			// What is this match
-			continue
+		if match.Teams[1].Name == nil {
+			match.Teams[1].Name = &tbd
 		}
 		if *match.Teams[0].Name != team && *match.Teams[1].Name != team {
 			// This match doesnt matter
