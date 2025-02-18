@@ -189,7 +189,13 @@ func HandleDota2Matches(s *discordgo.Session, m *discordgo.MessageCreate) {
 		fixedPST := time.FixedZone("PST", -8*3600)
 		content := fmt.Sprintf("Upcoming Dota 2 Promatches for %v \n", trackedTeams)
 
+		numTeams := len(reminderMap)
+		teamsWithNoGames := 0
 		for team, matchTimeMap := range reminderMap {
+			if len(matchTimeMap) == 0 {
+				teamsWithNoGames++
+				continue
+			}
 			content += "\n"
 			content += fmt.Sprintf("**%s** is playing: \n", team)
 			sortable := []opponentTime{}
@@ -214,6 +220,11 @@ func HandleDota2Matches(s *discordgo.Session, m *discordgo.MessageCreate) {
 				}
 			}
 		}
+		if teamsWithNoGames == numTeams {
+			content += "\n"
+			content += "No games tracked"
+		}
+
 		s.ChannelMessageSend(m.ChannelID, content)
 	}
 }
