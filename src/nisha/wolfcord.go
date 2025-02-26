@@ -125,3 +125,42 @@ func Miami(s *disc.Session, m *disc.MessageCreate) {
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("SPRING BREAK MIAMI %v WOOOOOOOO", string(year)))
 	}
 }
+
+func KillDamian (s *disc.Session, m *disc.MessageCreate) {
+	if m.Author.ID == s.State.User.ID {
+		return // it me
+	}
+
+	if m.GuildID != util.Wolfcord_GuildID {
+		return // only for nisha's discord
+	}
+
+	// if damian replies to erik specifically
+	if m.Message.Reference != nil {
+		referencedMsg, err := s.ChannelMessage(m.ChannelID, m.Message.Reference.MessageID)
+		if err == nil && referencedMsg.Author.ID == "ejporter" && m.Author.ID == "damianlx" {
+			postPicture(s, m.ChannelID)
+		}
+	}
+
+	// if damian replies after erik
+	messages, err := s.ChannelMessages(m.ChannelID, 2, m.ID, "", "")
+	if err == nil && len(messages) > 1 {
+		lastMessage := messages[1] 
+		if lastMessage.Author.ID == "ejporter" && m.Author.ID == "damianlx" {
+			postPicture(s, m.ChannelID)
+		}
+	}
+}
+
+func postPicture(s *disc.Session, channelID string) {
+	file, err := os.Open("./assets/lookattheflowers.jpg") 
+	if err != nil {
+		s.ChannelMessageSend(channelID, "Error: Unable to load image.")
+		return
+	}
+	defer file.Close()
+
+	// Send the image as an attachment
+	s.ChannelFileSend(channelID, "lookattheflowers.jpg", file)
+}
