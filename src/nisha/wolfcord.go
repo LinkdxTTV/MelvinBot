@@ -139,7 +139,7 @@ func KillDamian (s *disc.Session, m *disc.MessageCreate) {
 	if m.Message.Reference != nil {
 		referencedMsg, err := s.ChannelMessage(m.ChannelID, m.Message.Reference.MessageID)
 		if err == nil && referencedMsg.Author.ID == "ejporter" && m.Author.ID == "damianlx" {
-			postPicture(s, m.ChannelID)
+			s.ChannelMessageSend(m.ChannelID, "https://cdn.discordapp.com/attachments/1134537088973418628/1344474866275057756/erik_and_lenny_lasers.png?ex=67c1b40b&is=67c0628b&hm=fada9f8ea355f8e4f0cd15d8cf403c9e1b25679c3462bddb4e6e25046d330012&")
 		}
 	}
 
@@ -148,19 +148,7 @@ func KillDamian (s *disc.Session, m *disc.MessageCreate) {
 	if err == nil && len(messages) > 1 {
 		lastMessage := messages[1] 
 		if lastMessage.Author.ID == "ejporter" && m.Author.ID == "damianlx" {
-			postPicture(s, m.ChannelID)
+			s.ChannelMessageSend(m.ChannelID, "https://cdn.discordapp.com/attachments/1134537088973418628/1344474866275057756/erik_and_lenny_lasers.png?ex=67c1b40b&is=67c0628b&hm=fada9f8ea355f8e4f0cd15d8cf403c9e1b25679c3462bddb4e6e25046d330012&")
 		}
 	}
-}
-
-func postPicture(s *disc.Session, channelID string) {
-	file, err := os.Open("./assets/lookattheflowers.jpg") 
-	if err != nil {
-		s.ChannelMessageSend(channelID, "Error: Unable to load image.")
-		return
-	}
-	defer file.Close()
-
-	// Send the image as an attachment
-	s.ChannelFileSend(channelID, "lookattheflowers.jpg", file)
 }
