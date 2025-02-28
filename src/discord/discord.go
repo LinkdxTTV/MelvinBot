@@ -107,6 +107,7 @@ func (bot Bot) RunBot() {
 	bot.discord.AddHandler(nisha.Iiwii)
 	bot.discord.AddHandler(nisha.Lethimcook)
 	bot.discord.AddHandler(nisha.Miami)
+	bot.discord.AddHandler(nisha.KillDamian)
 	bot.discord.AddHandler(quotes.HandleQuote)
 	bot.discord.AddHandler(quotes.AddQuote)
 	bot.discord.AddHandler(quotes.RemoveQuote)
