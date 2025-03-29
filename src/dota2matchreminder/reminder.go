@@ -27,7 +27,14 @@ var trackedTeams []string = []string{TeamFalcons, TeamNigma}
 
 var cachedMatches []Match = []Match{}
 
-var reminderMap map[string]map[time.Time]string = map[string]map[time.Time]string{} // Map [ team name ] -> time as string to dedupe reminders (against opponent)
+var reminderMap map[string]map[time.Time]OpponentAndTimer = map[string]map[time.Time]OpponentAndTimer{} // Map [ team name ] -> time as string to dedupe reminders (against opponent)
+
+var lastRequest time.Time = time.Time{}
+
+type OpponentAndTimer struct {
+	opponent string
+	timer    *time.Timer
+}
 
 type Team struct {
 	Name *string `json:"name"`
@@ -87,7 +94,12 @@ func StartDota2MatchReminder(disc *discordgo.Session) error {
 	return nil
 }
 
-func GetAndCacheMatchesAndSetUpReminders(disc *discordgo.Session) error {
+func FetchFromMatchesSite() error {
+
+	if time.Since(lastRequest) < 10*time.Minute {
+		return nil
+	}
+
 	resp, err := http.Get(myBestFriendsWebsite)
 	if err != nil {
 		return fmt.Errorf("failed to grab from dota 2 tournament api: %v", err)
@@ -105,6 +117,16 @@ func GetAndCacheMatchesAndSetUpReminders(disc *discordgo.Session) error {
 	}
 
 	cachedMatches = matches
+	lastRequest = time.Now()
+	return nil
+}
+
+func GetAndCacheMatchesAndSetUpReminders(disc *discordgo.Session) error {
+	err := FetchFromMatchesSite()
+	if err != nil {
+		return err
+	}
+
 	for _, team := range trackedTeams {
 		CheckMatchesForTeamAndCreateReminderTimers(disc, team)
 	}
@@ -145,19 +167,22 @@ func CheckMatchesForTeamAndCreateReminderTimers(disc *discordgo.Session, team st
 
 		_, ok := reminderMap[team]
 		if !ok {
-			reminderMap[team] = map[time.Time]string{}
+			reminderMap[team] = map[time.Time]OpponentAndTimer{}
 		}
 
-		_, ok = reminderMap[team][matchTime]
+		oppTimer, ok := reminderMap[team][matchTime]
 		if ok {
-			continue
-		} else {
-			reminderMap[team][matchTime] = opponent
+			if oppTimer.opponent != tbd {
+				continue
+			}
 		}
+		var timer *time.Timer
 
 		if time.Now().Before(matchTime.Add(-30 * time.Minute)) {
-			time.AfterFunc(time.Until(matchTime.Add(-30*time.Minute)), ClosureForMatchSend(match, disc))
+			timer = time.AfterFunc(time.Until(matchTime.Add(-30*time.Minute)), ClosureForMatchSend(match, disc))
+			oppTimer.timer.Stop()
 		}
+		reminderMap[team][matchTime] = OpponentAndTimer{opponent: opponent, timer: timer}
 	}
 }
 
@@ -186,7 +211,11 @@ func HandleDota2Matches(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if strings.Contains(strings.ToLower(m.Message.Content), "!dota2matches") {
-		fixedPST := time.FixedZone("PST", -8*3600)
+		err := GetAndCacheMatchesAndSetUpReminders(s)
+		if err != nil {
+			log.Println("Failed to refresh matches")
+		}
+		fixedPST := time.FixedZone("PDT", -7*3600)
 		content := fmt.Sprintf("Upcoming Dota 2 Promatches for %v \n", trackedTeams)
 
 		numTeams := len(reminderMap)
@@ -201,7 +230,7 @@ func HandleDota2Matches(s *discordgo.Session, m *discordgo.MessageCreate) {
 			sortable := []opponentTime{}
 			for matchTime, opponent := range matchTimeMap {
 				sortable = append(sortable, opponentTime{
-					opponent:  opponent,
+					opponent:  opponent.opponent,
 					matchTime: matchTime,
 				})
 			}
