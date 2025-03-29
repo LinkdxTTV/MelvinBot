@@ -215,7 +215,7 @@ func HandleDota2Matches(s *discordgo.Session, m *discordgo.MessageCreate) {
 		if err != nil {
 			log.Println("Failed to refresh matches")
 		}
-		fixedPST := time.FixedZone("PDT", -7*3600)
+		PacificTime, _ := time.LoadLocation("America/Los_Angeles")
 		content := fmt.Sprintf("Upcoming Dota 2 Promatches for %v \n", trackedTeams)
 
 		numTeams := len(reminderMap)
@@ -242,10 +242,10 @@ func HandleDota2Matches(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 			for _, oppTime := range sortable {
 				if time.Now().Add(-2*time.Hour).Before(oppTime.matchTime) && time.Now().After(oppTime.matchTime) {
-					content += fmt.Sprintf("[**Possibly Live**] against **%s** at %s (%s ago) \n", oppTime.opponent, oppTime.matchTime.In(fixedPST).Format(time.RFC1123), fmtDuration(time.Until(oppTime.matchTime)))
+					content += fmt.Sprintf("[**Possibly Live**] against **%s** at %s (%s ago) \n", oppTime.opponent, oppTime.matchTime.In(PacificTime).Format(time.RFC1123), fmtDuration(time.Until(oppTime.matchTime)))
 				}
 				if time.Now().Before(oppTime.matchTime) {
-					content += fmt.Sprintf("against **%s** at %s (in %s) \n", oppTime.opponent, oppTime.matchTime.In(fixedPST).Format(time.RFC1123), fmtDuration(time.Until(oppTime.matchTime)))
+					content += fmt.Sprintf("against **%s** at %s (in %s) \n", oppTime.opponent, oppTime.matchTime.In(PacificTime).Format(time.RFC1123), fmtDuration(time.Until(oppTime.matchTime)))
 				}
 			}
 		}
