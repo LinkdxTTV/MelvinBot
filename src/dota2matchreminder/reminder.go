@@ -180,7 +180,9 @@ func CheckMatchesForTeamAndCreateReminderTimers(disc *discordgo.Session, team st
 
 		if time.Now().Before(matchTime.Add(-30 * time.Minute)) {
 			timer = time.AfterFunc(time.Until(matchTime.Add(-30*time.Minute)), ClosureForMatchSend(match, disc))
-			oppTimer.timer.Stop()
+			if oppTimer.timer != nil {
+				oppTimer.timer.Stop()
+			}
 		}
 		reminderMap[team][matchTime] = OpponentAndTimer{opponent: opponent, timer: timer}
 	}

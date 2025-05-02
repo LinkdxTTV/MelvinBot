@@ -24,9 +24,10 @@ type QuoteDatabase struct {
 }
 
 type Quote struct {
-	Quote  string
-	Author string
-	UserID string
+	Quote          string
+	AttachmentURLs []string
+	Author         string
+	UserID         string
 }
 
 func (q *Quote) String() string {
@@ -69,15 +70,32 @@ func AddQuote(s *disc.Session, m *disc.MessageReactionAdd) {
 		}
 	}
 
-	newQuoteID := AddQuoteToDatabase(guildID, message.Content, message.Author.Username, message.Author.ID)
+	// Check for attachments
+	attachments := []string{}
+
+	for _, attachment := range message.Attachments {
+		attachments = append(attachments, attachment.URL)
+	}
+
+	newQuoteID := AddQuoteToDatabase(guildID, message.Content, attachments, message.Author.Username, message.Author.ID)
 	// Finally ack
-	err = util.SendSelfDestructingMessage(s, m.ChannelID, fmt.Sprintf("Added quote [#%d]: ```%s``` -%s", newQuoteID, message.Content, message.Author.Username), 10*time.Second)
+	maybeContainsAttachments := ""
+	if len(attachments) > 0 {
+		maybeContainsAttachments += "[Contains Attachments]"
+	}
+
+	messageContent := ""
+	if len(message.Content) > 0 {
+		messageContent = fmt.Sprintf("```%s```", message.Content)
+	}
+
+	err = util.SendSelfDestructingMessage(s, m.ChannelID, fmt.Sprintf("Added quote [#%d]: %s %s -%s", newQuoteID, messageContent, maybeContainsAttachments, message.Author.Username), 10*time.Second)
 	if err != nil {
 		log.Printf("err sending self destructing msg: %v", err)
 	}
 }
 
-func AddQuoteToDatabase(guildID string, quote string, author string, userID string) int {
+func AddQuoteToDatabase(guildID string, quote string, attachmentURLs []string, author string, userID string) int {
 	// Just in case we have never made a quote for this guild?
 	database, ok := GuildIDToQuoteDatabase[guildID]
 	if !ok {
@@ -94,9 +112,10 @@ func AddQuoteToDatabase(guildID string, quote string, author string, userID stri
 	defer database.Lock.Unlock()
 
 	newQuote := Quote{
-		Quote:  quote,
-		Author: author,
-		UserID: userID,
+		Quote:          quote,
+		AttachmentURLs: attachmentURLs,
+		Author:         author,
+		UserID:         userID,
 	}
 
 	quoteIndex := -1
@@ -276,7 +295,17 @@ func (d *QuoteDatabase) SendQuote(s *disc.Session, ChannelID string, index int, 
 		author = user.Mention()
 	}
 
-	_, err = s.ChannelMessageSend(ChannelID, fmt.Sprintf("[#%d]: ```%s``` -%s", index, quote.Quote, author))
+	attachmentURLS := ""
+	for _, URL := range quote.AttachmentURLs {
+		attachmentURLS += "\n"
+		attachmentURLS += URL
+	}
+
+	var body string
+	if len(quote.Quote) > 0 {
+		body = fmt.Sprintf("```%s```", quote.Quote)
+	}
+	_, err = s.ChannelMessageSend(ChannelID, fmt.Sprintf("[#%d]: %s %s\n-%s", index, body, attachmentURLS, author))
 	if err != nil {
 		log.Printf("error sending message for random quote %v", err)
 	}
