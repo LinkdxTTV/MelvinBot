@@ -244,7 +244,7 @@ func HandleQuote(s *disc.Session, m *disc.MessageCreate) {
 
 	// Random quote
 	if m.Content == "!quote" {
-		database.SendQuote(s, m.ChannelID, rand.Intn(totalQuotes), totalQuotes)
+		database.SendRandomQuote(s, m.ChannelID, totalQuotes)
 		return
 	}
 
