@@ -2,7 +2,9 @@ package quotes
 
 import (
 	"MelvinBot/src/util"
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"strconv"
@@ -89,10 +91,8 @@ func AddQuote(s *disc.Session, m *disc.MessageReactionAdd) {
 		messageContent = fmt.Sprintf("```%s```", message.Content)
 	}
 
-	err = util.SendSelfDestructingMessage(s, m.ChannelID, fmt.Sprintf("Added quote [#%d]: %s %s -%s", newQuoteID, messageContent, maybeContainsAttachments, message.Author.Username), 10*time.Second)
-	if err != nil {
-		log.Printf("err sending self destructing msg: %v", err)
-	}
+	util.SendSelfDestructingMessage(s, m.ChannelID, fmt.Sprintf("Added quote [#%d]: %s %s -%s", newQuoteID, messageContent, maybeContainsAttachments, message.Author.Username), 10*time.Second)
+
 }
 
 func AddQuoteToDatabase(guildID string, quote string, attachmentURLs []string, author string, userID string) int {
@@ -235,10 +235,7 @@ func HandleQuote(s *disc.Session, m *disc.MessageCreate) {
 
 	totalQuotes := len(database.Quotes)
 	if totalQuotes == 0 {
-		err := util.SendSelfDestructingMessage(s, m.ChannelID, "This server has no saved quotes yet!", 10*time.Second)
-		if err != nil {
-			log.Printf("error sending message for random quote %v", err)
-		}
+		util.SendSelfDestructingMessage(s, m.ChannelID, "This server has no saved quotes yet!", 10*time.Second)
 		return
 	}
 
@@ -274,6 +271,12 @@ func HandleQuote(s *disc.Session, m *disc.MessageCreate) {
 			database.SendQuote(s, m.ChannelID, authorQuoteIndices[rand.Intn(len(authorQuoteIndices))], totalQuotes)
 			return
 		}
+	}
+
+	// allow getting all quotes
+	if strings.ToLower(split[1]) == "all" {
+		database.SendAllQuotesAsAttachment(s, m.ChannelID)
+		return
 	}
 	// Nothing we can do
 	util.SendSelfDestructingMessage(s, m.ChannelID, "You must specify a quote id (its a number) or a name like !quote 5 or !quote jesus", 5*time.Second)
@@ -332,4 +335,36 @@ func (d *QuoteDatabase) SendRandomQuote(s *disc.Session, ChannelID string, total
 		}
 		return
 	}
+}
+
+func (d *QuoteDatabase) SendAllQuotesAsAttachment(s *disc.Session, channelID string) {
+	var quoteBuffer bytes.Buffer
+
+	for i, quote := range d.Quotes {
+		if quote.Quote == DeletedQuoteString {
+			continue
+		}
+		tempQuote := fmt.Sprintf("%d : %s : %s ", i, quote.Author, quote.Quote)
+		if len(quote.AttachmentURLs) != 0 {
+			tempQuote += fmt.Sprintf("(Attachments: %s )", strings.Join(quote.AttachmentURLs, ", "))
+		}
+		tempQuote += "\r\n" // Add windows style newlines
+		quoteBuffer.WriteString(tempQuote)
+	}
+
+	var reader io.Reader = &quoteBuffer
+	filemsg, err := s.ChannelFileSend(channelID, "quotes.txt", reader)
+	if err != nil {
+		log.Printf("error sending all quotes %v", err)
+		return
+	}
+
+	util.SendSelfDestructingMessage(s, channelID, "Deleting this file in 30 seconds", 30*time.Second)
+	go func() {
+		time.Sleep(30 * time.Second)
+		err = s.ChannelMessageDelete(channelID, filemsg.ID)
+		if err != nil {
+			log.Printf("error deleting all quotes file %v", err)
+		}
+	}()
 }
