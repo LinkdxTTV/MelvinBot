@@ -16,6 +16,7 @@ import (
 	"MelvinBot/src/jellyfin"
 	"MelvinBot/src/nisha"
 	"MelvinBot/src/quotes"
+	"MelvinBot/src/nlquotes"
 	"MelvinBot/src/stats"
 	"MelvinBot/src/store"
 	"MelvinBot/src/util"
@@ -111,6 +112,7 @@ func (bot Bot) RunBot() {
 	bot.discord.AddHandler(quotes.HandleQuote)
 	bot.discord.AddHandler(quotes.AddQuote)
 	bot.discord.AddHandler(quotes.RemoveQuote)
+	bot.discord.AddHandler(nlquotes.HandleNLQuote)
 	bot.discord.AddHandler(jf.RecentHandler)
 	bot.discord.AddHandler(dota2matchreminder.HandleDota2Matches)
 
