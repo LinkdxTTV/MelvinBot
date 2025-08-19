@@ -16,7 +16,6 @@ import (
 type NLQuote struct {
     Text          string `json:"text"`
     TimestampStart string `json:"timestamp_start"`
-    ChannelSource string `json:"channel_source"`
 }
 
 type NLEntry struct {
