@@ -8,16 +8,23 @@ import (
   "net/http"
   "strings"
   "time"
+  "MelvinBot/src/util"
 
   disc "github.com/bwmarrin/discordgo"
 )
 
+type NLQuote struct {
+    Text          string `json:"text"`
+    TimestampStart string `json:"timestamp_start"`
+    ChannelSource string `json:"channel_source"`
+}
+
 type NLEntry struct {
-  VideoID       string    `json:"video_id"`
-  Title         string    `json:"title"`
-  UploadDate    string    `json:"upload_date"`
-  ChannelSource string    `json:"channel_source"`
-  Quotes        []NLQuote `json:"quotes"`
+    VideoID       string    `json:"video_id"`
+    Title         string    `json:"title"`
+    UploadDate    string    `json:"upload_date"`
+    ChannelSource string    `json:"channel_source"`
+    Quotes        []NLQuote `json:"quotes"`
 }
 
 func FetchNLQuote(search string) (string, error) {
@@ -37,10 +44,6 @@ func FetchNLQuote(search string) (string, error) {
 
     var apiResp struct {
         Data []NLEntry `json:"data"`
-        Total int      `json:"total"`
-        TotalQuotes int      `json:"totalQuotes"`
-        QueryTime int      `json:"queryTime"`
-        TotalTime int      `json:"totalTime"`
     }
 
     err = json.Unmarshal(body, &apiResp)
@@ -49,11 +52,10 @@ func FetchNLQuote(search string) (string, error) {
     }
 
     if len(apiResp.Data) == 0 {
-        return "", fmt.Errorf("no entries returned from API")
+        return "", nil
     }
 
     // Pick a random entry
-    rand.Seed(time.Now().UnixNano())
     randomEntry := apiResp.Data[rand.Intn(len(apiResp.Data))]
 
     if len(randomEntry.Quotes) == 0 {
@@ -63,7 +65,14 @@ func FetchNLQuote(search string) (string, error) {
     // Pick a random quote from the entry
     randomQuote := randomEntry.Quotes[rand.Intn(len(randomEntry.Quotes))]
 
-    return randomQuote.Text, nil
+    parsedTimestamp, err := strconv.ParseFloat(randomQuote.TimestampStart)
+    if err != nil {
+        return "", fmt.Errorf("had an issue parsing the timestamp: %w", err)
+    }
+    youtubeLink := fmt.Sprintf("https://youtu.be/%s/?t=%d", randomEntry.VideoID, int(parsedTimestamp))
+    hyperlink := fmt.Sprintf("[%s](%s)", randomQuote.Text, youtubeLink)
+
+    return hyperlink, nil
 }
 
 
@@ -99,8 +108,7 @@ func RandomNLQuote() (string, error) {
         return "", fmt.Errorf("no entries returned from API")
     }
 
-    // Pick a random NLEntry
-    rand.Seed(time.Now().UnixNano())
+    // Pick a random entry
     randomEntry := apiResp.Quotes[rand.Intn(len(apiResp.Quotes))]
 
     if len(randomEntry.Quotes) == 0 {
@@ -110,7 +118,14 @@ func RandomNLQuote() (string, error) {
     // Pick a random quote from the entry
     randomQuote := randomEntry.Quotes[rand.Intn(len(randomEntry.Quotes))]
 
-    return randomQuote.Text, nil
+    parsedTimestamp, err := strconv.ParseFloat(randomQuote.TimestampStart)
+    if err != nil {
+        return "", fmt.Errorf("had an issue parsing the timestamp: %w", err)
+    }
+    youtubeLink := fmt.Sprintf("https://youtu.be/%s/?t=%d", randomEntry.VideoID, int(parsedTimestamp))
+    hyperlink := fmt.Sprintf("[%s](%s)", randomQuote.Text, youtubeLink)
+
+    return hyperlink, nil
 }
 
 func HandleNLQuote(s *disc.Session, m *disc.MessageCreate) {
@@ -131,14 +146,17 @@ func HandleNLQuote(s *disc.Session, m *disc.MessageCreate) {
         // Case 1: No search term, fetch a completely random quote
         quote, err = RandomNLQuote()
         if err != nil {
-            s.ChannelMessageSend(m.ChannelID, "Error fetching random quote 😔, API down?")
+            util.SendSelfDestructingMessage(s, m.ChannelID, "couldn't pull a random quote sorry, maybe the API is down?", 5*time.Second)
             return
         }
     } else {
         // Case 2: Search term provided, fetch matching quotes
         quote, err = FetchNLQuote(searchTerm)
-        if err != nil {
+        if quote == "" && err == nil { // special case where the response array had length 0
             s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("shockingly NL has never said '%s'", searchTerm))
+        }
+        if err != nil {
+            util.SendSelfDestructingMessage(s, m.ChannelID, "sorry got an error trying that", 5*time.Second)
             return
         }
     }
