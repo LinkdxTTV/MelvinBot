@@ -29,7 +29,7 @@ type NLEntry struct {
 
 func FetchNLQuote(search string) (string, error) {
 	url := fmt.Sprintf("https://nlquotes.com/api?search=%s&page=1&strict=false&channel=all&selectedMode=searchText&year=&sort=default&game=all",
-		search)
+		url.QueryEscape(search))
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -70,9 +70,10 @@ func FetchNLQuote(search string) (string, error) {
 		return "", fmt.Errorf("had an issue parsing the timestamp: %w", err)
 	}
 	youtubeLink := fmt.Sprintf("https://youtu.be/%s/?t=%d", randomEntry.VideoID, int(parsedTimestamp))
-	hyperlink := fmt.Sprintf("[%s](%s)", randomQuote.Text, youtubeLink)
+    hyperlink := fmt.Sprintf("[%s](%s)", "link", youtubeLink)
+    finalMessage := fmt.Sprintf("%s\n%s", randomQuote.Text, hyperlink)
 
-	return hyperlink, nil
+    return finalMessage, nil
 }
 
 func RandomNLQuote() (string, error) {
@@ -122,9 +123,10 @@ func RandomNLQuote() (string, error) {
 		return "", fmt.Errorf("had an issue parsing the timestamp: %w", err)
 	}
 	youtubeLink := fmt.Sprintf("https://youtu.be/%s/?t=%d", randomEntry.VideoID, int(parsedTimestamp))
-	hyperlink := fmt.Sprintf("[%s](%s)", randomQuote.Text, youtubeLink)
+    hyperlink := fmt.Sprintf("[%s](%s)", "link", youtubeLink)
+    finalMessage := fmt.Sprintf("%s\n%s", randomQuote.Text, hyperlink)
 
-	return hyperlink, nil
+    return finalMessage, nil
 }
 
 func HandleNLQuote(s *disc.Session, m *disc.MessageCreate) {
