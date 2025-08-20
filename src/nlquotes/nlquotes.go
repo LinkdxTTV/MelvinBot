@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"regexp"
 
 	disc "github.com/bwmarrin/discordgo"
 )
@@ -26,6 +27,17 @@ type NLEntry struct {
 	UploadDate    string    `json:"upload_date"`
 	ChannelSource string    `json:"channel_source"`
 	Quotes        []NLQuote `json:"quotes"`
+}
+
+func convertBoldToMarkdown(input string) string {
+	// Replace <b> with **
+	re := regexp.MustCompile(`(?i)<\/?b>`)
+	return re.ReplaceAllStringFunc(input, func(tag string) string {
+		if tag[1] == '/' { // closing tag
+			return "**"
+		}
+		return "**"
+	})
 }
 
 func FetchNLQuote(search string) (string, error) {
@@ -65,6 +77,7 @@ func FetchNLQuote(search string) (string, error) {
 
 	// Pick a random quote from the entry
 	randomQuote := randomEntry.Quotes[rand.Intn(len(randomEntry.Quotes))]
+	cleanText := convertBoldToMarkdown(randomQuote.Text)
 
 	parsedTimestamp, err := strconv.ParseFloat(randomQuote.TimestampStart, 64)
 	if err != nil {
@@ -72,7 +85,7 @@ func FetchNLQuote(search string) (string, error) {
 	}
 	youtubeLink := fmt.Sprintf("https://youtu.be/%s/?t=%d", randomEntry.VideoID, int(parsedTimestamp))
 	hyperlink := fmt.Sprintf("[%s](%s)", "link", youtubeLink)
-	finalMessage := fmt.Sprintf("%s\n%s", randomQuote.Text, hyperlink)
+	finalMessage := fmt.Sprintf("%s\n%s", cleanText, hyperlink)
 
 	return finalMessage, nil
 }
@@ -118,6 +131,7 @@ func RandomNLQuote() (string, error) {
 
 	// Pick a random quote from the entry
 	randomQuote := randomEntry.Quotes[rand.Intn(len(randomEntry.Quotes))]
+	cleanText := convertBoldToMarkdown(randomQuote.Text)
 
 	parsedTimestamp, err := strconv.ParseFloat(randomQuote.TimestampStart, 64)
 	if err != nil {
@@ -125,7 +139,7 @@ func RandomNLQuote() (string, error) {
 	}
 	youtubeLink := fmt.Sprintf("https://youtu.be/%s/?t=%d", randomEntry.VideoID, int(parsedTimestamp))
 	hyperlink := fmt.Sprintf("[%s](%s)", "link", youtubeLink)
-	finalMessage := fmt.Sprintf("%s\n%s", randomQuote.Text, hyperlink)
+	finalMessage := fmt.Sprintf("%s\n%s", cleanText, hyperlink)
 
 	return finalMessage, nil
 }
