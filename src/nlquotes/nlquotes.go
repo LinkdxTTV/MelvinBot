@@ -7,11 +7,10 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
-	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
-	"regexp"
 
 	disc "github.com/bwmarrin/discordgo"
 )
@@ -40,90 +39,54 @@ func convertBoldToMarkdown(input string) string {
 	})
 }
 
-func FetchNLQuote(search string) (string, error) {
-	nlURL := fmt.Sprintf("https://nlquotes.com/api?search=%s&page=1&strict=false&channel=all&selectedMode=searchText&year=&sort=default&game=all",
-		url.QueryEscape(search))
-
-	resp, err := http.Get(nlURL)
+func queryNLAPI(endpoint string, params map[string]string, response any) error {
+	request, err := http.NewRequest("GET", fmt.Sprintf("https://nlquotes.com/api/%s", endpoint), nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch from API: %w", err)
+		return fmt.Errorf("Failed to parse URL")
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	query := request.URL.Query()
+	for key := range params {
+		query.Add(key, params[key])
+	}
+	request.URL.RawQuery = query.Encode()
+
+	httpResponse, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return "", fmt.Errorf("failed to read API response: %w", err)
+		return fmt.Errorf("failed to fetch from API: %w", err)
 	}
+	defer httpResponse.Body.Close()
 
-	var apiResp struct {
-		Data []NLEntry `json:"data"`
-	}
-
-	err = json.Unmarshal(body, &apiResp)
+	body, err := io.ReadAll(httpResponse.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to unmarshal API response: %w", err)
+		return fmt.Errorf("failed to read API response: %w", err)
 	}
 
-	if len(apiResp.Data) == 0 {
-		return "", nil
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal API response: %w", err)
 	}
 
-	// Pick a random entry
-	randomEntry := apiResp.Data[rand.Intn(len(apiResp.Data))]
+	return nil
+}
 
-	if len(randomEntry.Quotes) == 0 {
-		return "", fmt.Errorf("no quotes in selected entry")
-	}
+func formatNLQuote(entry NLEntry, quote NLQuote) (string, error) {
+	cleanText := convertBoldToMarkdown(quote.Text)
 
-	// Pick a random quote from the entry
-	randomQuote := randomEntry.Quotes[rand.Intn(len(randomEntry.Quotes))]
-	cleanText := convertBoldToMarkdown(randomQuote.Text)
-
-	parsedTimestamp, err := strconv.ParseFloat(randomQuote.TimestampStart, 64)
+	parsedTimestamp, err := strconv.ParseFloat(quote.TimestampStart, 64)
 	if err != nil {
 		return "", fmt.Errorf("had an issue parsing the timestamp: %w", err)
 	}
-	youtubeLink := fmt.Sprintf("https://youtu.be/%s/?t=%d", randomEntry.VideoID, int(parsedTimestamp))
+	youtubeLink := fmt.Sprintf("https://youtu.be/%s/?t=%d", entry.VideoID, int(parsedTimestamp))
 	hyperlink := fmt.Sprintf("[%s](%s)", "link", youtubeLink)
 	finalMessage := fmt.Sprintf("%s\n%s", cleanText, hyperlink)
 
 	return finalMessage, nil
 }
 
-func RandomNLQuote() (string, error) {
-	url := "https://nlquotes.com/api/random"
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch from API: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API returned status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read API response: %w", err)
-	}
-
-	// The API returns a top-level "quotes" array
-	var apiResp struct {
-		Quotes []NLEntry `json:"quotes"`
-	}
-
-	err = json.Unmarshal(body, &apiResp)
-	if err != nil {
-		return "", fmt.Errorf("failed to unmarshal API response: %w", err)
-	}
-
-	if len(apiResp.Quotes) == 0 {
-		return "", fmt.Errorf("no entries returned from API")
-	}
-
+func formatRandomNLEntry(entries []NLEntry) (string, error) {
 	// Pick a random entry
-	randomEntry := apiResp.Quotes[rand.Intn(len(apiResp.Quotes))]
+	randomEntry := entries[rand.Intn(len(entries))]
 
 	if len(randomEntry.Quotes) == 0 {
 		return "", fmt.Errorf("no quotes in selected entry")
@@ -131,17 +94,60 @@ func RandomNLQuote() (string, error) {
 
 	// Pick a random quote from the entry
 	randomQuote := randomEntry.Quotes[rand.Intn(len(randomEntry.Quotes))]
-	cleanText := convertBoldToMarkdown(randomQuote.Text)
 
-	parsedTimestamp, err := strconv.ParseFloat(randomQuote.TimestampStart, 64)
+	message, err := formatNLQuote(randomEntry, randomQuote)
+
 	if err != nil {
-		return "", fmt.Errorf("had an issue parsing the timestamp: %w", err)
+		return "", fmt.Errorf("failed to format quote: %w", err)
 	}
-	youtubeLink := fmt.Sprintf("https://youtu.be/%s/?t=%d", randomEntry.VideoID, int(parsedTimestamp))
-	hyperlink := fmt.Sprintf("[%s](%s)", "link", youtubeLink)
-	finalMessage := fmt.Sprintf("%s\n%s", cleanText, hyperlink)
 
-	return finalMessage, nil
+	return message, nil
+}
+
+func FetchNLQuote(search string) (string, error) {
+	var apiResp struct {
+		Data []NLEntry `json:"data"`
+	}
+
+	err := queryNLAPI("", map[string]string{
+		"search":       search,
+		"page":         "1",
+		"strict":       "false",
+		"channel":      "all",
+		"selectedMode": "searchText",
+		"year":         "",
+		"sort":         "default",
+		"game":         "all",
+	}, &apiResp)
+
+	if err != nil {
+		return "", err
+	}
+
+	if len(apiResp.Data) == 0 {
+		return "", nil
+	}
+
+	return formatRandomNLEntry(apiResp.Data)
+}
+
+func RandomNLQuote() (string, error) {
+	// The API returns a top-level "quotes" array
+	var apiResp struct {
+		Quotes []NLEntry `json:"quotes"`
+	}
+
+	err := queryNLAPI("random", map[string]string{}, &apiResp)
+
+	if err != nil {
+		return "", err
+	}
+
+	if len(apiResp.Quotes) == 0 {
+		return "", fmt.Errorf("no entries returned from API")
+	}
+
+	return formatRandomNLEntry(apiResp.Quotes)
 }
 
 func HandleNLQuote(s *disc.Session, m *disc.MessageCreate) {
