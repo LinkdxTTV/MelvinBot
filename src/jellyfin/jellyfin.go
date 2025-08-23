@@ -54,7 +54,7 @@ func NewJellyUpdater(disc *discordgo.Session) *JellyUpdater {
 
 // We absolutely assume jellyfin is running locally at http://localhost:8096/jelly btw
 func (j *JellyUpdater) GetRecentMediaSince(timeSince time.Time) ([]JellyMedia, []TVEpisodes, error) {
-	recentMediaEndpoint := fmt.Sprintf("http://localhost:8096/jelly/Users/%s/Items/Latest?fields=DateLastMediaAdded,DateCreated&enableImages=false&enableUserData=false", j.userID)
+	recentMediaEndpoint := fmt.Sprintf("http://localhost:8096/jelly/Users/%s/Items/Latest?fields=DateLastMediaAdded,DateCreated&enableImages=false&enableUserData=false&limit=100", j.userID)
 
 	url, err := url.Parse(recentMediaEndpoint)
 	if err != nil {
