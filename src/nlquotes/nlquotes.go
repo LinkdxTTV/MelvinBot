@@ -78,7 +78,16 @@ func formatNLQuote(entry NLEntry, quote NLQuote) (string, error) {
 		return "", fmt.Errorf("had an issue parsing the timestamp: %w", err)
 	}
 	youtubeLink := fmt.Sprintf("https://youtu.be/%s/?t=%d", entry.VideoID, int(parsedTimestamp))
-	hyperlink := fmt.Sprintf("[%s](%s)", "link", youtubeLink)
+
+	// Parse the timestamp using the RFC3339 layout
+	uploadDate, err := time.Parse(time.RFC3339, entry.UploadDate)
+	if err != nil {
+		return "", fmt.Errorf("Error parsing upload date: %w", err)
+	}
+
+	quoteOffset := time.Duration(parsedTimestamp * float64(time.Second))
+
+	hyperlink := fmt.Sprintf("[%s @ %s](%s)", uploadDate.Format("January 2, 2006"), quoteOffset.Round(time.Second), youtubeLink)
 	finalMessage := fmt.Sprintf("%s\n%s", cleanText, hyperlink)
 
 	return finalMessage, nil
