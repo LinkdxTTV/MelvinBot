@@ -15,6 +15,10 @@ import (
 	disc "github.com/bwmarrin/discordgo"
 )
 
+const (
+	EntriesPerPage int = 10
+)
+
 type NLQuote struct {
 	Text           string `json:"text"`
 	TimestampStart string `json:"timestamp_start"`
@@ -97,14 +101,18 @@ func formatRandomNLEntry(entries []NLEntry) (string, error) {
 	// Pick a random entry
 	randomEntry := entries[rand.Intn(len(entries))]
 
-	if len(randomEntry.Quotes) == 0 {
+	return formatRandomNLQuote(randomEntry)
+}
+
+func formatRandomNLQuote(entry NLEntry) (string, error) {
+	if len(entry.Quotes) == 0 {
 		return "", fmt.Errorf("no quotes in selected entry")
 	}
 
 	// Pick a random quote from the entry
-	randomQuote := randomEntry.Quotes[rand.Intn(len(randomEntry.Quotes))]
+	randomQuote := entry.Quotes[rand.Intn(len(entry.Quotes))]
 
-	message, err := formatNLQuote(randomEntry, randomQuote)
+	message, err := formatNLQuote(entry, randomQuote)
 
 	if err != nil {
 		return "", fmt.Errorf("failed to format quote: %w", err)
@@ -114,11 +122,24 @@ func formatRandomNLEntry(entries []NLEntry) (string, error) {
 }
 
 func FetchNLQuote(search string) (string, error) {
+	// So the API returns a series of entries, each of which can have multiple
+	// quotes. 10 entries are returned per page.
+	//
+	// We want to pick a random quote, but we can't predict which page a given
+	// quote will be present on.
+	//
+	// 	We _can_ guarantee which page a given _entry_ will be on
+	// 	(`entryIndex/10 + 1`), so we'll settle for picking a random entry and
+	// 	then selecting a random quote from that entry. This will bias results
+	// 	_away_ from quotes in entries with many quotes, but that's fine.
+
 	var apiResp struct {
-		Data []NLEntry `json:"data"`
+		Data        []NLEntry `json:"data"`
+		Total       int       `json:"total"`
+		TotalQuotes int       `json:"totalQuotes"`
 	}
 
-	err := queryNLAPI("", map[string]string{
+	headers := map[string]string{
 		"search":       search,
 		"page":         "1",
 		"strict":       "false",
@@ -127,17 +148,32 @@ func FetchNLQuote(search string) (string, error) {
 		"year":         "",
 		"sort":         "default",
 		"game":         "all",
-	}, &apiResp)
+	}
+
+	err := queryNLAPI("", headers, &apiResp)
 
 	if err != nil {
 		return "", err
+	}
+
+	entryIndex := rand.Intn(apiResp.Total)
+
+	if entryIndex >= EntriesPerPage {
+		page := entryIndex/EntriesPerPage + 1
+		entryIndex = entryIndex % EntriesPerPage
+		headers["page"] = strconv.Itoa(page)
+		err = queryNLAPI("", headers, &apiResp)
+
+		if err != nil {
+			return "", err
+		}
 	}
 
 	if len(apiResp.Data) == 0 {
 		return "", nil
 	}
 
-	return formatRandomNLEntry(apiResp.Data)
+	return formatRandomNLQuote(apiResp.Data[entryIndex])
 }
 
 func RandomNLQuote() (string, error) {
