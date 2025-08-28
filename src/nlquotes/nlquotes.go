@@ -118,6 +118,12 @@ func FetchNLQuote(search string) (string, error) {
 		Data []NLEntry `json:"data"`
 	}
 
+	// The API only respects U+0022 QUOTATION MARK for exact searches but phone
+	// keyboards tend to type U+201C and U+201D LEFT and RIGHT DOUBLE QUOTATION
+	// MARK respectively, so let's replace those.
+	search = strings.ReplaceAll(search, "“", "\"")
+	search = strings.ReplaceAll(search, "”", "\"")
+
 	err := queryNLAPI("", map[string]string{
 		"search":       search,
 		"page":         "1",
