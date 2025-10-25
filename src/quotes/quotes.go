@@ -320,19 +320,11 @@ func (d *QuoteDatabase) SendRandomQuote(s *disc.Session, ChannelID string, total
 
 		// Check if we can mention this author
 		quote := d.Quotes[index]
-		author := quote.Author
 		if quote.Quote == DeletedQuoteString {
 			continue // Dont random a deleted quote
 		}
-		user, err := s.User(quote.UserID)
-		if err == nil && user != nil {
-			author = user.Mention()
-		}
 
-		_, err = s.ChannelMessageSend(ChannelID, fmt.Sprintf("[#%d]: ```%s``` -%s", index, quote.Quote, author))
-		if err != nil {
-			log.Printf("error sending message for random quote %v", err)
-		}
+		d.SendQuote(s, ChannelID, index, totalQuotes)
 		return
 	}
 }
