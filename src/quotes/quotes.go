@@ -421,8 +421,10 @@ func (d *QuoteDatabase) SendQuoteStats(s *disc.Session, channelID string) {
 		if ac.author != "unknown" {
 			// Map to a username
 			user, err := s.User(ac.author)
+			// Pull out any stupid markdown marking
+			username := strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(user.Username, "_", ""), "*", ""), "`", "")
 			if err == nil {
-				outputStr += fmt.Sprintf("%s : %d \n", user.Username, ac.count)
+				outputStr += fmt.Sprintf("%s : %d \n", username, ac.count)
 			}
 		}
 	}
