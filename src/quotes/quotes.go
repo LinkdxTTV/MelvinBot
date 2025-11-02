@@ -7,6 +7,8 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -278,6 +280,12 @@ func HandleQuote(s *disc.Session, m *disc.MessageCreate) {
 		database.SendAllQuotesAsAttachment(s, m.ChannelID)
 		return
 	}
+
+	// allow quote leaderboard.. even if the author string is weird..
+	if strings.ToLower((split[1])) == "stats" {
+		database.SendQuoteStats(s, m.ChannelID)
+		return
+	}
 	// Nothing we can do
 	util.SendSelfDestructingMessage(s, m.ChannelID, "You must specify a quote id (its a number) or a name like !quote 5 or !quote jesus", 5*time.Second)
 
@@ -307,6 +315,11 @@ func (d *QuoteDatabase) SendQuote(s *disc.Session, ChannelID string, index int, 
 	var body string
 	if len(quote.Quote) > 0 {
 		body = fmt.Sprintf("```%s```", quote.Quote)
+	}
+	// If the quote is just a URL, i.e. its meant to be rendered, then we can just send it without quotes to render it.. Attempt to parse it as a url
+	_, err = url.Parse(quote.Quote)
+	if err == nil {
+		body = quote.Quote
 	}
 	_, err = s.ChannelMessageSend(ChannelID, fmt.Sprintf("[#%d]: %s %s\n-%s", index, body, attachmentURLS, author))
 	if err != nil {
@@ -359,4 +372,67 @@ func (d *QuoteDatabase) SendAllQuotesAsAttachment(s *disc.Session, channelID str
 			log.Printf("error deleting all quotes file %v", err)
 		}
 	}()
+}
+
+func (d *QuoteDatabase) SendQuoteStats(s *disc.Session, channelID string) {
+	authorToCount := map[string]int{}
+
+	for _, q := range d.Quotes {
+		var userId string
+		if q.UserID == "" {
+			userId = "unknown"
+		} else {
+			userId = q.UserID
+		}
+		_, ok := authorToCount[userId]
+		if !ok {
+			authorToCount[userId] = 0
+		}
+
+		authorToCount[userId]++
+	}
+
+	type authorCount struct {
+		author string
+		count  int
+	}
+
+	asList := []authorCount{}
+
+	// Convert to a list so we can sort
+	for k, v := range authorToCount {
+		asList = append(asList, authorCount{
+			author: k,
+			count:  v,
+		})
+	}
+
+	// Remember unknown quotes
+	unknownCount := authorToCount["unknown"]
+
+	// Sort it
+	sort.SliceStable(asList, func(i, j int) bool {
+		return asList[i].count > asList[j].count
+	})
+
+	// Construct the output
+	outputStr := ":speech_balloon: Quote Leaderboard :speech_balloon:\n =======================\n"
+	for _, ac := range asList {
+		if ac.author != "unknown" {
+			// Map to a username
+			user, err := s.User(ac.author)
+			if err == nil {
+				outputStr += fmt.Sprintf("%s : %d \n", user.Username, ac.count)
+			}
+		}
+	}
+
+	if unknownCount != 0 {
+		outputStr += fmt.Sprintf("\n This does not count %d quotes from unknown authors (probably from manually parsed quotes)", unknownCount)
+	}
+
+	_, err := s.ChannelMessageSend(channelID, outputStr)
+	if err != nil {
+		log.Printf("error sending quote stats: %v", err)
+	}
 }
