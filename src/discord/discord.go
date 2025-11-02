@@ -94,27 +94,29 @@ func (bot Bot) RunBot() {
 		log.Println("error in dota 2 match reminder", err)
 	}
 
-	// Add handlers here
-	bot.discord.AddHandler(monkaS)
-	bot.discord.AddHandler(stats.TrackStats)
-	bot.discord.AddHandler(stats.PrintStats)
-	bot.discord.AddHandler(pinFromReaction)
-	bot.discord.AddHandler(unpinFromReaction)
-	bot.discord.AddHandler(nisha.DidSomebodySaySex)
-	bot.discord.AddHandler(nisha.ThisIsNotADvd)
-	bot.discord.AddHandler(nisha.GeorgeCarlin)
-	bot.discord.AddHandler(nisha.Tetazoo)
-	bot.discord.AddHandler(nisha.Glounge)
-	bot.discord.AddHandler(nisha.Iiwii)
-	bot.discord.AddHandler(nisha.Lethimcook)
-	bot.discord.AddHandler(nisha.Miami)
-	bot.discord.AddHandler(nisha.KillDamian)
-	bot.discord.AddHandler(quotes.HandleQuote)
-	bot.discord.AddHandler(quotes.AddQuote)
-	bot.discord.AddHandler(quotes.RemoveQuote)
-	bot.discord.AddHandler(nlquotes.HandleNLQuote)
-	bot.discord.AddHandler(jf.RecentHandler)
-	bot.discord.AddHandler(dota2matchreminder.HandleDota2Matches)
+	// Add message handlers here
+	bot.discord.AddHandler(goMessageHandler(monkaS))
+	bot.discord.AddHandler(goMessageHandler(stats.TrackStats))
+	bot.discord.AddHandler(goMessageHandler(stats.PrintStats))
+	bot.discord.AddHandler(goMessageHandler(nisha.DidSomebodySaySex))
+	bot.discord.AddHandler(goMessageHandler(nisha.ThisIsNotADvd))
+	bot.discord.AddHandler(goMessageHandler(nisha.GeorgeCarlin))
+	bot.discord.AddHandler(goMessageHandler(nisha.Tetazoo))
+	bot.discord.AddHandler(goMessageHandler(nisha.Glounge))
+	bot.discord.AddHandler(goMessageHandler(nisha.Iiwii))
+	bot.discord.AddHandler(goMessageHandler(nisha.Lethimcook))
+	bot.discord.AddHandler(goMessageHandler(nisha.Miami))
+	bot.discord.AddHandler(goMessageHandler(nisha.KillDamian))
+	bot.discord.AddHandler(goMessageHandler(quotes.HandleQuote))
+	bot.discord.AddHandler(goMessageHandler(quotes.RemoveQuote))
+	bot.discord.AddHandler(goMessageHandler(nlquotes.HandleNLQuote))
+	bot.discord.AddHandler(goMessageHandler(jf.RecentHandler))
+	bot.discord.AddHandler(goMessageHandler(dota2matchreminder.HandleDota2Matches))
+
+	// add other handlers here (reacts etc)
+	bot.discord.AddHandler(goReactionAddHandler(quotes.AddQuote))
+	bot.discord.AddHandler(goReactionAddHandler(pinFromReaction))
+	bot.discord.AddHandler(goReactionRemoveHandler(unpinFromReaction))
 
 	err = bot.discord.Open()
 	if err != nil {
@@ -175,4 +177,22 @@ func sendRandomQuote(s *disc.Session, channelID string, guildID string) {
 	}
 
 	database.SendQuote(s, channelID, rand.Intn(totalQuotes), totalQuotes)
+}
+
+func goMessageHandler(f func(*disc.Session, *disc.MessageCreate)) func(*disc.Session, *disc.MessageCreate) {
+	return func(s *disc.Session, mc *disc.MessageCreate) {
+		go f(s, mc)
+	}
+}
+
+func goReactionAddHandler(f func(*disc.Session, *disc.MessageReactionAdd)) func(*disc.Session, *disc.MessageReactionAdd) {
+	return func(s *disc.Session, mc *disc.MessageReactionAdd) {
+		go f(s, mc)
+	}
+}
+
+func goReactionRemoveHandler(f func(*disc.Session, *disc.MessageReactionRemove)) func(*disc.Session, *disc.MessageReactionRemove) {
+	return func(s *disc.Session, mc *disc.MessageReactionRemove) {
+		go f(s, mc)
+	}
 }
