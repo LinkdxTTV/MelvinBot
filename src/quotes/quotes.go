@@ -317,8 +317,8 @@ func (d *QuoteDatabase) SendQuote(s *disc.Session, ChannelID string, index int, 
 		body = fmt.Sprintf("```%s```", quote.Quote)
 	}
 	// If the quote is just a URL, i.e. its meant to be rendered, then we can just send it without quotes to render it.. Attempt to parse it as a url
-	_, err = url.Parse(quote.Quote)
-	if err == nil {
+	url, err := url.Parse(quote.Quote)
+	if err == nil && url != nil {
 		body = quote.Quote
 	}
 	_, err = s.ChannelMessageSend(ChannelID, fmt.Sprintf("[#%d]: %s %s\n-%s", index, body, attachmentURLS, author))
