@@ -183,6 +183,10 @@ func RemoveQuote(s *disc.Session, m *disc.MessageCreate) {
 	defer database.Lock.Unlock()
 
 	OriginalQuote := database.Quotes[quoteInt]
+	if strings.EqualFold(OriginalQuote.UserID, m.Author.ID) {
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("You cannot delete a quote you authored [Quote #%d]", quoteInt))
+		return
+	}
 	// Remove from that authors history
 	AuthorIndices, ok := database.MapFromAuthorToQuoteIndices[strings.ToLower(OriginalQuote.Author)]
 	if ok {
