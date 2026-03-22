@@ -16,11 +16,12 @@ type Storage interface {
 }
 
 type localStorage struct {
-	filename string
-	input    any
+	filename   string
+	input      any
+	keepBackup bool
 }
 
-func NewLocalStorage(input any, filename ...string) (*localStorage, error) {
+func NewLocalStorage(input any, backup bool, filename ...string) (*localStorage, error) {
 	if len(filename) > 1 {
 		return nil, errors.New("cannot specify more than one filepath for local stoage")
 	}
@@ -30,8 +31,9 @@ func NewLocalStorage(input any, filename ...string) (*localStorage, error) {
 	}
 
 	return &localStorage{
-		filename: filename[0],
-		input:    input,
+		filename:   filename[0],
+		input:      input,
+		keepBackup: backup,
 	}, nil
 }
 
@@ -49,7 +51,26 @@ func (s *localStorage) Put() error {
 	if err != nil {
 		return errors.New("could not write stats to file")
 	}
-	return statsFile.Close()
+	err = statsFile.Close()
+	if err != nil {
+		return err
+	}
+
+	if s.keepBackup {
+		statsFileBackup, err := os.Create(s.filename + "_backup")
+		if err != nil {
+			return errors.New("could not create stats backup file")
+		}
+		_, err = statsFileBackup.Write(statsAsJson)
+		if err != nil {
+			return errors.New("could not write stats backup to file")
+		}
+		err = statsFileBackup.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *localStorage) Get() error {

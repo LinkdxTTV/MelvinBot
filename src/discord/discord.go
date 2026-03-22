@@ -39,12 +39,12 @@ func NewBot(token string) Bot {
 	}
 
 	statsFile := "/etc/melvinstats"
-	storage, err := store.NewLocalStorage(&stats.StatsPerGuild, statsFile)
+	storage, err := store.NewLocalStorage(&stats.StatsPerGuild, true, statsFile)
 	if err != nil {
 		log.Fatal("could not get local stats")
 	}
 
-	quotes, err := store.NewLocalStorage(&quotes.GuildIDToQuoteDatabase, quotes.Filepath)
+	quotes, err := store.NewLocalStorage(&quotes.GuildIDToQuoteDatabase, true, quotes.Filepath)
 	if err != nil {
 		log.Fatal("could not get quotes")
 	}
