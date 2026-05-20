@@ -96,6 +96,7 @@ func (bot Bot) RunBot() {
 
 	// Add message handlers here
 	bot.discord.AddHandler(goMessageHandler(monkaS))
+	bot.discord.AddHandler(goMessageHandler(csBoring))
 	bot.discord.AddHandler(goMessageHandler(stats.TrackStats))
 	bot.discord.AddHandler(goMessageHandler(stats.PrintStats))
 	bot.discord.AddHandler(goMessageHandler(nisha.DidSomebodySaySex))
@@ -153,6 +154,22 @@ func monkaS(s *disc.Session, m *disc.MessageCreate) {
 
 	if strings.Contains(strings.ToLower(m.Message.Content), "monkas") {
 		s.ChannelMessageSend(m.ChannelID, "monkaS")
+	}
+}
+
+func csBoring(s *disc.Session, m *disc.MessageCreate) {
+	if m.Author.ID == s.State.User.ID {
+		return // it me
+	}
+
+	if m.GuildID != util.Melvin_GuildID {
+		return
+	}
+
+	if strings.Contains(m.Message.Content, " cs") || m.Message.Content == "cs" {
+		boringStrings := []string{"im bored", "bored", "boring", "boring game"}
+		randInt := rand.Intn(len(boringStrings))
+		s.ChannelMessageSend(m.ChannelID, boringStrings[randInt])
 	}
 }
 
