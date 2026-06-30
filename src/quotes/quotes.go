@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
@@ -32,6 +33,9 @@ type Quote struct {
 	AttachmentURLs []string
 	Author         string
 	UserID         string
+	MessageID      string
+	ChannelID      string
+	NeedsRef       bool
 }
 
 func (q *Quote) String() string {
@@ -81,7 +85,7 @@ func AddQuote(s *disc.Session, m *disc.MessageReactionAdd) {
 		attachments = append(attachments, attachment.URL)
 	}
 
-	newQuoteID := AddQuoteToDatabase(guildID, message.Content, attachments, message.Author.Username, message.Author.ID)
+	newQuoteID := AddQuoteToDatabase(guildID, message.Content, attachments, message.Author.Username, message.Author.ID, message.ID, message.ChannelID)
 	// Finally ack
 	maybeContainsAttachments := ""
 	if len(attachments) > 0 {
@@ -97,7 +101,7 @@ func AddQuote(s *disc.Session, m *disc.MessageReactionAdd) {
 
 }
 
-func AddQuoteToDatabase(guildID string, quote string, attachmentURLs []string, author string, userID string) int {
+func AddQuoteToDatabase(guildID string, quote string, attachmentURLs []string, author string, userID string, messageID string, channelID string) int {
 	// Just in case we have never made a quote for this guild?
 	database, ok := GuildIDToQuoteDatabase[guildID]
 	if !ok {
@@ -113,11 +117,22 @@ func AddQuoteToDatabase(guildID string, quote string, attachmentURLs []string, a
 	database.Lock.Lock()
 	defer database.Lock.Unlock()
 
+	needsRef := false
+	for _, URL := range attachmentURLs {
+		if isAudioFile(URL) {
+			needsRef = true
+			break
+		}
+	}
+
 	newQuote := Quote{
 		Quote:          quote,
 		AttachmentURLs: attachmentURLs,
 		Author:         author,
 		UserID:         userID,
+		MessageID:      messageID,
+		ChannelID:      channelID,
+		NeedsRef:       needsRef,
 	}
 
 	quoteIndex := -1
@@ -310,8 +325,42 @@ func (d *QuoteDatabase) SendQuote(s *disc.Session, ChannelID string, index int, 
 		author = user.Mention()
 	}
 
+	attachmentURLs := quote.AttachmentURLs
+	if quote.NeedsRef && quote.MessageID != "" && quote.ChannelID != "" {
+		liveMsg, errFetch := s.ChannelMessage(quote.ChannelID, quote.MessageID)
+		if errFetch == nil && liveMsg != nil {
+			attachmentURLs = []string{}
+			for _, att := range liveMsg.Attachments {
+				attachmentURLs = append(attachmentURLs, att.URL)
+			}
+		} else {
+			log.Printf("error fetching live message to refresh attachments: %v", errFetch)
+		}
+	}
+
+	var files []*disc.File
+	var nonAudioAttachmentURLs []string
+
+	for _, URL := range attachmentURLs {
+		if isAudioFile(URL) {
+			data, err := downloadFile(URL)
+			if err == nil {
+				filename := getFilenameFromURL(URL)
+				files = append(files, &disc.File{
+					Name:   filename,
+					Reader: bytes.NewReader(data),
+				})
+			} else {
+				log.Printf("error downloading audio file %s: %v", URL, err)
+				nonAudioAttachmentURLs = append(nonAudioAttachmentURLs, URL)
+			}
+		} else {
+			nonAudioAttachmentURLs = append(nonAudioAttachmentURLs, URL)
+		}
+	}
+
 	attachmentURLS := ""
-	for _, URL := range quote.AttachmentURLs {
+	for _, URL := range nonAudioAttachmentURLs {
 		attachmentURLS += "\n"
 		attachmentURLS += URL
 	}
@@ -325,10 +374,76 @@ func (d *QuoteDatabase) SendQuote(s *disc.Session, ChannelID string, index int, 
 	if err == nil {
 		body = quote.Quote
 	}
-	_, err = s.ChannelMessageSend(ChannelID, fmt.Sprintf("[#%d]: %s %s\n-%s", index, body, attachmentURLS, author))
+
+	content := fmt.Sprintf("[#%d]: %s %s\n-%s", index, body, attachmentURLS, author)
+	_, err = s.ChannelMessageSendComplex(ChannelID, &disc.MessageSend{
+		Content: content,
+		Files:   files,
+	})
 	if err != nil {
 		log.Printf("error sending message for random quote %v", err)
 	}
+}
+
+func cleanURL(urlStr string) string {
+	urlStr = strings.ReplaceAll(urlStr, "\\u0026", "&")
+	urlStr = strings.ReplaceAll(urlStr, "&amp;", "&")
+	return urlStr
+}
+
+func downloadFile(urlStr string) ([]byte, error) {
+	urlStr = cleanURL(urlStr)
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	req, err := http.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("bad status: %s", resp.Status)
+	}
+
+	return io.ReadAll(resp.Body)
+}
+
+func isAudioFile(urlStr string) bool {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return false
+	}
+	lowerPath := strings.ToLower(u.Path)
+	audioExtensions := []string{".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac", ".opus"}
+	for _, ext := range audioExtensions {
+		if strings.HasSuffix(lowerPath, ext) {
+			return true
+		}
+	}
+	return false
+}
+
+func getFilenameFromURL(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return "audio.mp3"
+	}
+	parts := strings.Split(u.Path, "/")
+	if len(parts) > 0 {
+		name := parts[len(parts)-1]
+		if name != "" {
+			return name
+		}
+	}
+	return "audio.mp3"
 }
 
 func (d *QuoteDatabase) SendRandomQuote(s *disc.Session, ChannelID string, totalQuotes int) {
