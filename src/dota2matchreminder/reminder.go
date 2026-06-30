@@ -218,7 +218,8 @@ func HandleDota2Matches(s *discordgo.Session, m *discordgo.MessageCreate) {
 			log.Println("Failed to refresh matches")
 		}
 		PacificTime, _ := time.LoadLocation("America/Los_Angeles")
-		content := fmt.Sprintf("Upcoming Dota 2 Promatches for %v \n", trackedTeams)
+		var content strings.Builder
+		content.WriteString(fmt.Sprintf("Upcoming Dota 2 Promatches for %v \n", trackedTeams))
 
 		numTeams := len(reminderMap)
 		teamsWithNoGames := 0
@@ -227,8 +228,8 @@ func HandleDota2Matches(s *discordgo.Session, m *discordgo.MessageCreate) {
 				teamsWithNoGames++
 				continue
 			}
-			content += "\n"
-			content += fmt.Sprintf("**%s** is playing: \n", team)
+			content.WriteString("\n")
+			content.WriteString(fmt.Sprintf("**%s** is playing: \n", team))
 			sortable := []opponentTime{}
 			for matchTime, opponent := range matchTimeMap {
 				sortable = append(sortable, opponentTime{
@@ -244,19 +245,19 @@ func HandleDota2Matches(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 			for _, oppTime := range sortable {
 				if time.Now().Add(-2*time.Hour).Before(oppTime.matchTime) && time.Now().After(oppTime.matchTime) {
-					content += fmt.Sprintf("[**Possibly Live**] against **%s** at %s (%s ago) \n", oppTime.opponent, oppTime.matchTime.In(PacificTime).Format(time.RFC1123), fmtDuration(time.Until(oppTime.matchTime)))
+					content.WriteString(fmt.Sprintf("[**Possibly Live**] against **%s** at %s (%s ago) \n", oppTime.opponent, oppTime.matchTime.In(PacificTime).Format(time.RFC1123), fmtDuration(time.Until(oppTime.matchTime))))
 				}
 				if time.Now().Before(oppTime.matchTime) {
-					content += fmt.Sprintf("against **%s** at %s (in %s) \n", oppTime.opponent, oppTime.matchTime.In(PacificTime).Format(time.RFC1123), fmtDuration(time.Until(oppTime.matchTime)))
+					content.WriteString(fmt.Sprintf("against **%s** at %s (in %s) \n", oppTime.opponent, oppTime.matchTime.In(PacificTime).Format(time.RFC1123), fmtDuration(time.Until(oppTime.matchTime))))
 				}
 			}
 		}
 		if teamsWithNoGames == numTeams {
-			content += "\n"
-			content += "No games tracked"
+			content.WriteString("\n")
+			content.WriteString("No games tracked")
 		}
 
-		s.ChannelMessageSend(m.ChannelID, content)
+		s.ChannelMessageSend(m.ChannelID, content.String())
 	}
 }
 

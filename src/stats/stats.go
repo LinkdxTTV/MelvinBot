@@ -3,6 +3,7 @@ package stats
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	disc "github.com/bwmarrin/discordgo"
@@ -76,10 +77,11 @@ func PrintStats(s *disc.Session, m *disc.MessageCreate) {
 		return sortable[i].posts > sortable[j].posts
 	})
 
-	statsMessage := "Melvin Posts Leaderboard:"
+	var statsMessage strings.Builder
+	statsMessage.WriteString("Melvin Posts Leaderboard:")
 	for _, message := range sortable {
-		statsMessage += fmt.Sprintf("\n%s : %d", message.name, message.posts)
+		statsMessage.WriteString(fmt.Sprintf("\n%s : %d", message.name, message.posts))
 	}
 
-	s.ChannelMessageSend(m.ChannelID, statsMessage)
+	s.ChannelMessageSend(m.ChannelID, statsMessage.String())
 }

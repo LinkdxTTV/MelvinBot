@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -117,13 +118,7 @@ func AddQuoteToDatabase(guildID string, quote string, attachmentURLs []string, a
 	database.Lock.Lock()
 	defer database.Lock.Unlock()
 
-	needsRef := false
-	for _, URL := range attachmentURLs {
-		if isAudioFile(URL) {
-			needsRef = true
-			break
-		}
-	}
+	needsRef := slices.ContainsFunc(attachmentURLs, isAudioFile)
 
 	newQuote := Quote{
 		Quote:          quote,
@@ -359,10 +354,10 @@ func (d *QuoteDatabase) SendQuote(s *disc.Session, ChannelID string, index int, 
 		}
 	}
 
-	attachmentURLS := ""
+	var attachmentURLS strings.Builder
 	for _, URL := range nonAudioAttachmentURLs {
-		attachmentURLS += "\n"
-		attachmentURLS += URL
+		attachmentURLS.WriteString("\n")
+		attachmentURLS.WriteString(URL)
 	}
 
 	var body string
@@ -375,7 +370,7 @@ func (d *QuoteDatabase) SendQuote(s *disc.Session, ChannelID string, index int, 
 		body = quote.Quote
 	}
 
-	content := fmt.Sprintf("[#%d]: %s %s\n-%s", index, body, attachmentURLS, author)
+	content := fmt.Sprintf("[#%d]: %s %s\n-%s", index, body, attachmentURLS.String(), author)
 	_, err = s.ChannelMessageSendComplex(ChannelID, &disc.MessageSend{
 		Content: content,
 		Files:   files,
@@ -535,7 +530,8 @@ func (d *QuoteDatabase) SendQuoteStats(s *disc.Session, channelID string) {
 	})
 
 	// Construct the output
-	outputStr := ":speech_balloon: Quote Leaderboard :speech_balloon:\n =======================\n"
+	var outputStr strings.Builder
+	outputStr.WriteString(":speech_balloon: Quote Leaderboard :speech_balloon:\n =======================\n")
 	for _, ac := range asList {
 		if ac.author != "unknown" {
 			// Map to a username
@@ -543,16 +539,16 @@ func (d *QuoteDatabase) SendQuoteStats(s *disc.Session, channelID string) {
 			// Pull out any stupid markdown marking
 			username := strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(user.Username, "_", ""), "*", ""), "`", "")
 			if err == nil {
-				outputStr += fmt.Sprintf("%s : %d \n", username, ac.count)
+				outputStr.WriteString(fmt.Sprintf("%s : %d \n", username, ac.count))
 			}
 		}
 	}
 
 	if unknownCount != 0 {
-		outputStr += fmt.Sprintf("\n This does not count %d quotes from unknown authors (probably from manually parsed quotes)", unknownCount)
+		outputStr.WriteString(fmt.Sprintf("\n This does not count %d quotes from unknown authors (probably from manually parsed quotes)", unknownCount))
 	}
 
-	_, err := s.ChannelMessageSend(channelID, outputStr)
+	_, err := s.ChannelMessageSend(channelID, outputStr.String())
 	if err != nil {
 		log.Printf("error sending quote stats: %v", err)
 	}
