@@ -167,7 +167,7 @@ func csBoring(s *disc.Session, m *disc.MessageCreate) {
 	}
 
 	if strings.Contains(m.Message.Content, " cs") || m.Message.Content == "cs" {
-		boringStrings := []string{"im bored", "bored", "boring", "boring game"}
+		boringStrings := []string{"im bored", "bored", "boring", "boring game", "cs = conventus stellarum BATCHEST", "conventus stellarum!!", "are you talking about conventus stellarum?"}
 		randInt := rand.Intn(len(boringStrings))
 		s.ChannelMessageSend(m.ChannelID, boringStrings[randInt])
 	}
