@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"MelvinBot/src/computah"
 	"MelvinBot/src/dota2matchreminder"
 	"MelvinBot/src/jellyfin"
 	"MelvinBot/src/nisha"
@@ -113,6 +114,7 @@ func (bot Bot) RunBot() {
 	bot.discord.AddHandler(goMessageHandler(nlquotes.HandleNLQuote))
 	bot.discord.AddHandler(goMessageHandler(jf.RecentHandler))
 	bot.discord.AddHandler(goMessageHandler(dota2matchreminder.HandleDota2Matches))
+	bot.discord.AddHandler(goMessageHandler(computah.HandleComputah))
 
 	// add other handlers here (reacts etc)
 	bot.discord.AddHandler(goReactionAddHandler(quotes.AddQuote))
