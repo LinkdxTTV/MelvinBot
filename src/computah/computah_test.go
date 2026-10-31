@@ -91,3 +91,51 @@ func TestRateLimiterRollingWindow(t *testing.T) {
 		t.Fatalf("expected daily server limit reason, got %q", reason)
 	}
 }
+
+func TestSuppressNonImageEmbeds(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "bare website link",
+			input: "Check out https://example.com/article for details.",
+			want:  "Check out <https://example.com/article> for details.",
+		},
+		{
+			name:  "bare link with trailing period",
+			input: "Visit https://example.com/test.",
+			want:  "Visit <https://example.com/test>.",
+		},
+		{
+			name:  "markdown link",
+			input: "Here is [Wikipedia](https://en.wikipedia.org/wiki/Dune_(novel)) for more info.",
+			want:  "Here is [Wikipedia](<https://en.wikipedia.org/wiki/Dune_(novel)>) for more info.",
+		},
+		{
+			name:  "already wrapped link",
+			input: "Already wrapped <https://example.com> and [MD](<https://example.com>).",
+			want:  "Already wrapped <https://example.com> and [MD](<https://example.com>).",
+		},
+		{
+			name:  "image links stay unwrapped",
+			input: "Image: https://example.com/photo.png and https://example.com/pic.jpg?size=large.",
+			want:  "Image: https://example.com/photo.png and https://example.com/pic.jpg?size=large.",
+		},
+		{
+			name:  "mixed image and web links",
+			input: "Source: https://youtube.com/watch?v=123 and thumbnail https://i.imgur.com/abc.webp",
+			want:  "Source: <https://youtube.com/watch?v=123> and thumbnail https://i.imgur.com/abc.webp",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := suppressNonImageEmbeds(tc.input)
+			if got != tc.want {
+				t.Errorf("suppressNonImageEmbeds(%q) = %q, want %q", tc.input, got, tc.want)
+			}
+		})
+	}
+}

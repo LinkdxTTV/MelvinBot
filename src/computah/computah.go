@@ -8,7 +8,10 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -246,11 +249,71 @@ func queryGemini(userPrompt string) (string, error) {
 		return "", fmt.Errorf("empty response from gemini")
 	}
 
+	result = suppressNonImageEmbeds(result)
+
 	if len(result) > discordMaxMessageLen {
 		result = result[:discordMaxMessageLen-3] + "..."
 	}
 
 	return result, nil
+}
+
+var urlRegex = regexp.MustCompile(`https?://[^\s<>]+`)
+
+func isImageURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	ext := strings.ToLower(path.Ext(u.Path))
+	switch ext {
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".avif":
+		return true
+	default:
+		return false
+	}
+}
+
+// suppressNonImageEmbeds wraps non-image URLs in <...> so Discord renders them as
+// clickable links without generating website/video preview embeds, while leaving
+// direct image URLs unwrapped so Discord still pre-renders images.
+func suppressNonImageEmbeds(text string) string {
+	var out strings.Builder
+	lastIdx := 0
+
+	for _, loc := range urlRegex.FindAllStringIndex(text, -1) {
+		start, end := loc[0], loc[1]
+
+		// Trim trailing punctuation or markdown closing parentheses that are not part of the URL
+		for end > start {
+			lastChar := text[end-1]
+			if strings.ContainsRune(".,;:!?'\"", rune(lastChar)) {
+				end--
+			} else if lastChar == ')' && strings.Count(text[start:end], ")") > strings.Count(text[start:end], "(") {
+				end--
+			} else if lastChar == ']' && strings.Count(text[start:end], "]") > strings.Count(text[start:end], "[") {
+				end--
+			} else {
+				break
+			}
+		}
+
+		rawURL := text[start:end]
+		alreadyWrapped := start > 0 && text[start-1] == '<' && end < len(text) && text[end] == '>'
+
+		out.WriteString(text[lastIdx:start])
+		if alreadyWrapped || isImageURL(rawURL) {
+			out.WriteString(rawURL)
+		} else {
+			out.WriteByte('<')
+			out.WriteString(rawURL)
+			out.WriteByte('>')
+		}
+		lastIdx = end
+	}
+
+	out.WriteString(text[lastIdx:])
+	return out.String()
 }
 
 func HandleComputah(s *disc.Session, m *disc.MessageCreate) {
